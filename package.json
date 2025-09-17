@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "biome check",
     "format": "biome format --write",
+    "test": "vitest",
     "prepare": "husky"
   },
   "dependencies": {
@@ -23,7 +24,8 @@
     "@types/react-dom": "^19",
     "husky": "^9.1.7",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.4"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json}": [
