@@ -1,0 +1,556 @@
+openapi: 3.0.3
+info:
+  title: StackAI API
+  description: |
+    API for managing connections, resources, and knowledge bases in StackAI.
+  version: 1.0.0
+  contact:
+    name: StackAI
+    url: https://stack-ai.com
+servers:
+  - url: https://api.stack-ai.com
+    description: Production API server
+  - url: https://sb.stack-ai.com
+    description: Auth server
+
+paths:
+  /auth/v1/token:
+    post:
+      tags:
+        - Authentication
+      summary: Authenticate user and get access token
+      description: Login with email/password to get Bearer token for API access
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+                - grant_type
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "user@example.com"
+                password:
+                  type: string
+                  format: password
+                  example: "password123"
+                grant_type:
+                  type: string
+                  enum: ["password"]
+                gotrue_meta_security:
+                  type: object
+                  example: {}
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                    description: Bearer token for API authentication
+                  token_type:
+                    type: string
+                    example: "bearer"
+                  expires_in:
+                    type: integer
+                    example: 3600
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /organizations/me/current:
+    get:
+      tags:
+        - Organizations
+      summary: Get current organization
+      description: Retrieve the current organization information for the authenticated user
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current organization information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  org_id:
+                    type: string
+                    description: Organization ID
+                    example: "org_12345"
+
+  /connections:
+    get:
+      tags:
+        - Connections
+      summary: List connections
+      description: Get all connections for the authenticated user, optionally filtered by provider
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: connection_provider
+          in: query
+          description: Filter by connection provider
+          schema:
+            type: string
+            enum: ["gdrive"]
+            example: "gdrive"
+        - name: limit
+          in: query
+          description: Maximum number of connections to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+            example: 1
+      responses:
+        '200':
+          description: List of connections
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Connection'
+
+  /connections/{connection_id}/resources:
+    get:
+      tags:
+        - Resources
+      summary: Get resource metadata
+      description: Retrieve metadata for specific resources by their IDs
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: connection_id
+          in: path
+          required: true
+          description: Connection ID
+          schema:
+            type: string
+            example: "conn_12345"
+        - name: resource_ids
+          in: query
+          required: true
+          description: Comma-separated list of resource IDs
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Resource metadata
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Resource'
+
+  /connections/{connection_id}/resources/children:
+    get:
+      tags:
+        - Resources
+      summary: List child resources
+      description: Get child resources (files and folders) for a given resource or root level
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: connection_id
+          in: path
+          required: true
+          description: Connection ID
+          schema:
+            type: string
+            example: "conn_12345"
+        - name: resource_id
+          in: query
+          description: Parent resource ID. Omit for root level resources.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of child resources
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Resource'
+                  nextPageToken:
+                    type: string
+                    description: Token for pagination (if applicable)
+
+  /knowledge_bases:
+    post:
+      tags:
+        - Knowledge Bases
+      summary: Create knowledge base
+      description: Create a new knowledge base with specified connection resources
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - connection_id
+                - connection_source_ids
+                - name
+                - indexing_params
+              properties:
+                connection_id:
+                  type: string
+                  description: Connection ID to use for this knowledge base
+                  example: "conn_12345"
+                connection_source_ids:
+                  type: array
+                  items:
+                    type: string
+                  description: List of resource IDs to include in the knowledge base
+                name:
+                  type: string
+                  description: Name of the knowledge base
+                  example: "Test Knowledge Base"
+                description:
+                  type: string
+                  description: Description of the knowledge base
+                  example: "This is a test knowledge base"
+                indexing_params:
+                  $ref: '#/components/schemas/IndexingParams'
+                org_level_role:
+                  type: string
+                  nullable: true
+                  description: Organization level role permissions
+                cron_job_id:
+                  type: string
+                  nullable: true
+                  description: Cron job ID for automated syncing
+      responses:
+        '201':
+          description: Knowledge base created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  knowledge_base_id:
+                    type: string
+                    description: ID of the created knowledge base
+                    example: "kb_12345"
+
+  /knowledge_bases/sync/trigger/{knowledge_base_id}/{org_id}:
+    get:
+      tags:
+        - Knowledge Bases
+      summary: Trigger knowledge base sync
+      description: Start syncing resources into the knowledge base
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: knowledge_base_id
+          in: path
+          required: true
+          description: Knowledge base ID
+          schema:
+            type: string
+            example: "kb_12345"
+        - name: org_id
+          in: path
+          required: true
+          description: Organization ID
+          schema:
+            type: string
+            example: "org_12345"
+      responses:
+        '200':
+          description: Sync triggered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "sync_started"
+                  message:
+                    type: string
+                    example: "Knowledge base sync has been triggered"
+
+  /knowledge_bases/{knowledge_base_id}/resources/children:
+    get:
+      tags:
+        - Knowledge Bases
+      summary: List knowledge base resources
+      description: Get resources within a knowledge base
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: knowledge_base_id
+          in: path
+          required: true
+          description: Knowledge base ID
+          schema:
+            type: string
+            example: "kb_12345"
+        - name: resource_path
+          in: query
+          description: Path within the knowledge base
+          schema:
+            type: string
+            example: "/"
+      responses:
+        '200':
+          description: List of knowledge base resources
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/KnowledgeBaseResource'
+
+  /knowledge_bases/{knowledge_base_id}/resources:
+    delete:
+      tags:
+        - Knowledge Bases
+      summary: Delete resource from knowledge base
+      description: De-index a specific resource from the knowledge base
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: knowledge_base_id
+          in: path
+          required: true
+          description: Knowledge base ID
+          schema:
+            type: string
+            example: "kb_12345"
+        - name: resource_path
+          in: query
+          required: true
+          description: Path of the resource to delete
+          schema:
+            type: string
+            example: "papers/paper.pdf"
+      responses:
+        '200':
+          description: Resource deleted successfully
+        '404':
+          description: Resource not found
+
+    post:
+      tags:
+        - Knowledge Bases
+      summary: Create resource in knowledge base
+      description: Add a new file resource to the knowledge base
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: knowledge_base_id
+          in: path
+          required: true
+          description: Knowledge base ID
+          schema:
+            type: string
+            example: "kb_12345"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+                - resource_type
+                - resource_path
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: File content to upload
+                resource_type:
+                  type: string
+                  enum: ["file"]
+                  description: Type of resource being created
+                resource_path:
+                  type: string
+                  description: Path where the file should be created
+                  example: "papers/demo_file.txt"
+      responses:
+        '201':
+          description: Resource created successfully
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Use the access token obtained from the /auth/v1/token endpoint
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        error_description:
+          type: string
+          description: Detailed error description
+
+    Connection:
+      type: object
+      properties:
+        connection_id:
+          type: string
+          description: Unique connection identifier
+          example: "96891794-4313-42f1-9d98-237e526165b8"
+        name:
+          type: string
+          description: Display name of the connection
+          example: "My Google Drive"
+        connection_provider:
+          type: string
+          description: Provider type
+          enum: ["gdrive"]
+          example: "gdrive"
+        created_at:
+          type: string
+          format: date-time
+          description: When the connection was created
+        updated_at:
+          type: string
+          format: date-time
+          description: When the connection was last updated
+
+    Resource:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Internal resource ID
+        resource_id:
+          type: string
+          description: External resource ID (e.g., Google Drive file ID)
+        name:
+          type: string
+          description: Resource name
+          example: "Very Important notes.txt"
+        inode_type:
+          type: string
+          enum: ["file", "directory"]
+          description: Type of resource
+        inode_path:
+          type: object
+          properties:
+            path:
+              type: string
+              description: Full path to the resource
+              example: "Very Important notes.txt"
+        mimeType:
+          type: string
+          description: MIME type of the resource
+          example: "text/plain"
+        size:
+          type: integer
+          description: Size in bytes (for files)
+          example: 1024
+        indexedStatus:
+          type: string
+          enum: ["indexed", "not_indexed", "indexing"]
+          description: Current indexing status
+          example: "not_indexed"
+
+    KnowledgeBaseResource:
+      allOf:
+        - $ref: '#/components/schemas/Resource'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: ["pending", "indexed", "failed", "processing"]
+              description: Processing status within the knowledge base
+              example: "indexed"
+
+    IndexingParams:
+      type: object
+      required:
+        - ocr
+        - unstructured
+        - embedding_params
+        - chunker_params
+      properties:
+        ocr:
+          type: boolean
+          description: Enable OCR for image and PDF processing
+          default: false
+        unstructured:
+          type: boolean
+          description: Enable unstructured document processing
+          default: true
+        embedding_params:
+          type: object
+          properties:
+            embedding_model:
+              type: string
+              description: Embedding model to use
+              enum: ["text-embedding-ada-002", "text-embedding-3-small", "text-embedding-3-large"]
+              example: "text-embedding-ada-002"
+            api_key:
+              type: string
+              nullable: true
+              description: API key for embedding service (null to use default)
+        chunker_params:
+          type: object
+          properties:
+            chunk_size:
+              type: integer
+              description: Size of each text chunk
+              minimum: 100
+              maximum: 4000
+              default: 1500
+              example: 1500
+            chunk_overlap:
+              type: integer
+              description: Overlap between chunks
+              minimum: 0
+              maximum: 1000
+              default: 500
+              example: 500
+            chunker:
+              type: string
+              description: Chunking strategy
+              enum: ["sentence", "paragraph", "token"]
+              default: "sentence"
+              example: "sentence"
+
+tags:
+  - name: Authentication
+    description: User authentication and token management
+  - name: Organizations
+    description: Organization information
+  - name: Connections
+    description: External service connections (Google Drive)
+  - name: Resources
+    description: Files and folders within connections
+  - name: Knowledge Bases
+    description: Knowledge base creation and management
