@@ -145,14 +145,7 @@ export const FileRow = memo(function FileRow({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <button
-        type="button"
-        className="relative flex flex-shrink-0 items-center w-6 h-6 after:content-[''] after:absolute after:inset-[-12px] border-0 bg-transparent p-0"
-        onClick={(e) => {
-          e.stopPropagation()
-          handleSelectChange(!isSelected)
-        }}
-      >
+      <div className="relative flex flex-shrink-0 items-center w-6 h-6">
         {shouldShowCheckbox ? (
           <Checkbox
             checked={isSelected}
@@ -163,7 +156,7 @@ export const FileRow = memo(function FileRow({
         ) : (
           getFileIcon()
         )}
-      </button>
+      </div>
 
       {/* name */}
       <div className="flex-1 min-w-0">
