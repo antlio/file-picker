@@ -3,7 +3,11 @@
  * defines interfaces for connection resources, indexing status, and api responses
  */
 
-export type IndexedStatus = 'indexed' | 'not_indexed' | 'indexing'
+export type IndexedStatus =
+  | 'indexed'
+  | 'not_indexed'
+  | 'indexing'
+  | 'deindexing'
 
 /**
  * represents a file or folder item from the connection
@@ -11,15 +15,15 @@ export type IndexedStatus = 'indexed' | 'not_indexed' | 'indexing'
 export interface File {
   id: string
   resource_id: string
-  name: string
   inode_type: 'file' | 'directory'
   inode_path: {
     path: string
   }
-  mimeType?: string
+  content_mime?: string
   size?: number
   indexedStatus: IndexedStatus
   status?: string
+  knowledge_base_id?: string
 }
 
 /**
@@ -48,6 +52,7 @@ export interface IndexResponse {
   jobId?: string
   status: string
   message?: string
+  knowledgeBaseId?: string
 }
 
 /**
