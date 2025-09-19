@@ -714,7 +714,7 @@ export function FileListContainer({
           </Tabs>
         </div>
       </div>
-      <div className="h-full overflow-auto">
+      <div className="h-[calc(100dvh-153px)] overflow-auto">
         <div className="bg-[image:radial-gradient(circle,_var(--color-border)_0.5px,_transparent_0.5px)] bg-[size:2.5px_2.5px] bg-[position:0px_0px] px-1.5">
           {/* folders section */}
           {!showSkeletonContent &&
@@ -770,7 +770,7 @@ export function FileListContainer({
               </div>
             )}
         </div>
-        <div className="bg-[image:radial-gradient(circle,_var(--color-border)_0.5px,_transparent_0.5px)] bg-[size:2.5px_2.5px] bg-[position:0px_0px] h-full px-1.5">
+        <div className="bg-[image:radial-gradient(circle,_var(--color-border)_0.5px,_transparent_0.5px)] bg-[size:2.5px_2.5px] bg-[position:0px_0px] px-1.5">
           {/* file list */}
           <div className="bg-background border-x flex-1 flex flex-col h-full px-2.5 pb-2.5">
             <div className="sticky pt-4 top-0 z-10 bg-white">
