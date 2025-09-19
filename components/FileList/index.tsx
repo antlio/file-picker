@@ -8,7 +8,6 @@ import {
   SortDesc,
   X,
 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Folder from '@/assets/Folder'
 import FolderOpen from '@/assets/FolderOpen'
@@ -24,8 +23,10 @@ import {
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useDeindexAction } from '@/hooks/useDeindexAction'
+import { useFileNavigation } from '@/hooks/useFileNavigation'
 import { useFolderListing, usePrefetchFolder } from '@/hooks/useFolderListing'
 import { useIndexAction } from '@/hooks/useIndexAction'
+import { usePathMapping } from '@/hooks/usePathMapping'
 import { useSearchSort } from '@/hooks/useSearchSort'
 import type { File } from '@/lib/types'
 import { generateFolderCacheKey } from '@/utils/cache-keys'
@@ -99,42 +100,26 @@ export function FileListContainer({
   onFileClick,
   initialPath = [],
 }: FileListContainerProps) {
-  const router = useRouter()
+  // clean state management
+  const { pathToIdMap, updatePathMapping, addFolderMapping } = usePathMapping()
+
+  const {
+    currentFolderPath,
+    currentFolderId,
+    isNavigatingToFolder,
+    handleFolderNavigate,
+    clearNavigationState,
+  } = useFileNavigation({
+    initialPath,
+    pathToIdMap,
+  })
+
+  // Component state
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
-  const [currentFolderPath, setCurrentFolderPath] = useState<string>('/')
   const [currentFilter, setCurrentFilter] = useState<
     'all' | 'indexed' | 'not_indexed'
   >('all')
-  const [isNavigatingToFolder, setIsNavigatingToFolder] = useState(false)
   const [hoveredFolderId, setHoveredFolderId] = useState<string | null>(null)
-  const [pathToIdMap, setPathToIdMap] = useState<Map<string, string>>(new Map())
-  const [_isBuildingPathMapping, setIsBuildingPathMapping] = useState(false)
-
-  /**
-   * update URL with current folder path using clean path-based routing
-   */
-  const updateURL = useCallback(
-    (folderPath: string) => {
-      const searchParams = new URLSearchParams(window.location.search)
-      const searchQuery = searchParams.toString()
-      const queryString = searchQuery ? `?${searchQuery}` : ''
-
-      // remove leading/trailing slashes and encode each segment separately
-      const cleanPath =
-        folderPath === '/' ? '' : folderPath.replace(/^\/+|\/+$/g, '')
-      const pathSegments = cleanPath
-        .split('/')
-        .filter((segment) => segment.length > 0)
-      const encodedPath =
-        pathSegments.length > 0
-          ? `/${pathSegments.map((segment) => encodeURIComponent(segment)).join('/')}`
-          : ''
-
-      router.push(`${encodedPath}${queryString}`, { scroll: false })
-    },
-    [router],
-  )
 
   const { searchQuery, sortBy, sortOrder, updateSearch, updateSort } =
     useSearchSort()
@@ -157,185 +142,33 @@ export function FileListContainer({
     mutate,
   } = useFolderListing(connectionId, currentFolderId, baseParams)
 
+  // path mappings progressive
   useEffect(() => {
     if (rootItems.length > 0) {
-      setPathToIdMap((prev) => {
-        const newMap = new Map(prev)
-        rootItems.forEach((item) => {
-          if (item.inode_type === 'directory' && item.inode_path?.path) {
-            newMap.set(`/${item.inode_path.path}`, item.resource_id)
-          }
-        })
-        return newMap
-      })
+      updatePathMapping(rootItems)
     }
-  }, [rootItems])
+  }, [rootItems, updatePathMapping])
 
   useEffect(() => {
     if (currentItems.length > 0) {
-      setPathToIdMap((prev) => {
-        const newMap = new Map(prev)
-        currentItems.forEach((item) => {
-          if (item.inode_type === 'directory' && item.inode_path?.path) {
-            newMap.set(`/${item.inode_path.path}`, item.resource_id)
-          }
-        })
-        return newMap
-      })
+      updatePathMapping(currentItems)
     }
-  }, [currentItems])
+  }, [currentItems, updatePathMapping])
 
   // clear navigation state when new folder data loads
   useEffect(() => {
     if (!isLoading && currentItems.length >= 0 && isNavigatingToFolder) {
       const timer = setTimeout(() => {
-        setIsNavigatingToFolder(false)
+        clearNavigationState()
       }, 100)
       return () => clearTimeout(timer)
     }
-  }, [isLoading, currentItems.length, isNavigatingToFolder])
-
-  useEffect(() => {
-    async function buildNestedPathMapping() {
-      if (!connectionId || !initialPath.length) return
-
-      const decodedPathSegments = initialPath.map((segment) =>
-        decodeURIComponent(segment),
-      )
-      const targetFolderPath = `/${decodedPathSegments.join('/')}`
-
-      if (targetFolderPath === '/' || pathToIdMap.has(targetFolderPath)) {
-        return
-      }
-
-      setIsBuildingPathMapping(true)
-
-      try {
-        const { listResources, getDefaultAuthHeaders } = await import(
-          '@/lib/api'
-        )
-        const headers = await getDefaultAuthHeaders()
-
-        let currentLevelId: string | null = null
-        let builtPath = ''
-
-        for (let i = 0; i < decodedPathSegments.length; i++) {
-          const segment = decodedPathSegments[i]
-          const nextPath = `${builtPath}/${segment}`
-
-          if (pathToIdMap.has(nextPath)) {
-            currentLevelId = pathToIdMap.get(nextPath) || null
-            builtPath = nextPath
-            continue
-          }
-
-          // same cache key format as useFolderListing hook
-          const cacheKey = generateFolderCacheKey(
-            connectionId,
-            currentLevelId,
-            baseParams,
-          )
-
-          // SWR cache first, otherwise fetch
-          const { mutate } = await import('swr')
-          let result: { data?: File[] } | null = null
-          // fetch and populate SWR cache
-          const freshData = await listResources(
-            connectionId,
-            currentLevelId,
-            baseParams,
-            headers,
-          )
-
-          // store in SWR cache for future use
-          await mutate(cacheKey, freshData, false)
-          result = freshData
-
-          const folderItems = (result.data || []).filter(
-            (item: File) => item.inode_type === 'directory',
-          )
-
-          const newMappings = new Map<string, string>()
-          folderItems.forEach((folder: File) => {
-            if (folder.inode_path?.path) {
-              const fullPath = `/${folder.inode_path.path}`
-              newMappings.set(fullPath, folder.resource_id)
-            }
-          })
-
-          if (newMappings.size > 0) {
-            setPathToIdMap((prev) => {
-              const updatedMap = new Map(prev)
-              newMappings.forEach((id, path) => {
-                updatedMap.set(path, id)
-              })
-              return updatedMap
-            })
-          }
-
-          const targetFolder = folderItems.find((folder: File) => {
-            if (!folder.inode_path?.path) return false
-
-            const fullTargetPath = decodedPathSegments.slice(0, i + 1).join('/')
-            return folder.inode_path.path === fullTargetPath
-          })
-
-          if (targetFolder) {
-            currentLevelId = targetFolder.resource_id
-            builtPath = `/${targetFolder.inode_path.path}`
-
-            // Check if this is our final target path
-            if (builtPath !== targetFolderPath) {
-              break
-            }
-          }
-        }
-      } catch (_) {
-      } finally {
-        setIsBuildingPathMapping(false)
-      }
-    }
-
-    buildNestedPathMapping()
-  }, [connectionId, initialPath, baseParams, pathToIdMap])
-
-  // init from URL path (path-based navigation)
-  useEffect(() => {
-    const decodedPathSegments = initialPath.map((segment) =>
-      decodeURIComponent(segment),
-    )
-    const targetFolderPath =
-      decodedPathSegments.length > 0 ? `/${decodedPathSegments.join('/')}` : '/'
-
-    if (targetFolderPath !== '/' && pathToIdMap.size === 0) {
-      return
-    }
-
-    if (targetFolderPath !== currentFolderPath) {
-      setIsNavigatingToFolder(true)
-      setCurrentFolderPath(targetFolderPath)
-
-      // look up the folder ID from the path
-      let folderId: string | null = null
-
-      if (targetFolderPath === '/') {
-        folderId = null
-      } else {
-        folderId = pathToIdMap.get(targetFolderPath) || null
-      }
-
-      if (currentFolderId !== folderId) {
-        setCurrentFolderId(folderId)
-      }
-    } else {
-      if (targetFolderPath !== '/') {
-        const folderId = pathToIdMap.get(targetFolderPath) || null
-        if (folderId && folderId !== currentFolderId) {
-          setCurrentFolderId(folderId)
-        }
-      }
-    }
-  }, [initialPath, currentFolderPath, pathToIdMap, currentFolderId])
+  }, [
+    isLoading,
+    currentItems.length,
+    isNavigatingToFolder,
+    clearNavigationState,
+  ])
 
   const { indexResource, indexBulk } = useIndexAction(connectionId || '')
   const { deindexResource, deindexBulk } = useDeindexAction(connectionId || '')
@@ -415,20 +248,21 @@ export function FileListContainer({
   }, [filteredItems])
 
   /**
-   * handle folder navigation with optimistic caching
+   * handle folder navigation using new hook pattern
    */
-  const handleFolderNavigate = useCallback(
+  const handleFolderClick = useCallback(
     async (folder: File) => {
       const folderPath = folder.inode_path?.path
         ? `/${folder.inode_path.path}`
         : `/${folder.resource_id}`
 
-      // immediately update path mapping
-      setPathToIdMap((prev) =>
-        new Map(prev).set(folderPath, folder.resource_id),
-      )
+      // immediately update path mapping for this folder
+      addFolderMapping(folderPath, folder.resource_id)
 
-      // prefetch the folder contents before navigating
+      // clear selected items and prefetch if needed
+      setSelectedItems(new Set())
+
+      // prefetch the folder contents if not already cached
       if (connectionId) {
         try {
           await prefetch(connectionId, folder.resource_id, baseParams)
@@ -437,15 +271,16 @@ export function FileListContainer({
         }
       }
 
-      setIsNavigatingToFolder(true)
-
-      // navigate immediately
-      setCurrentFolderId(folder.resource_id)
-      setCurrentFolderPath(folderPath)
-      setSelectedItems(new Set())
-      updateURL(folderPath)
+      // navigate using the hook
+      handleFolderNavigate(folderPath, folder.resource_id)
     },
-    [updateURL, connectionId, baseParams, prefetch],
+    [
+      addFolderMapping,
+      connectionId,
+      baseParams,
+      prefetch,
+      handleFolderNavigate,
+    ],
   )
 
   /**
@@ -560,7 +395,7 @@ export function FileListContainer({
       .filter(
         (item) =>
           item.knowledge_base_id &&
-          item.knowledge_base_id !== '00000000-0000-0000-0000-000000000000',
+          item.knowledge_base_id !== '00000000-0000-0000-000000000000',
       )
 
     // Group by knowledge base ID since bulk operations require the same KB
@@ -605,6 +440,7 @@ export function FileListContainer({
     currentFolderId,
   ])
 
+  // Navigation state calculations
   const isNavigating =
     isLoading || (currentItems.length === 0 && !isError) || isNavigatingToFolder
   const decodedPathSegments = initialPath.map((segment) =>
@@ -614,16 +450,23 @@ export function FileListContainer({
     decodedPathSegments.length > 0 ? `/${decodedPathSegments.join('/')}` : '/'
   const isPathMismatch = targetFolderPath !== currentFolderPath
 
-  // Show skeleton during navigation or path mismatch to avoid showing wrong content
-  const showSkeletonContent =
-    (isLoading && currentItems.length === 0) ||
-    isNavigatingToFolder ||
-    isPathMismatch ||
-    _isBuildingPathMapping
+  // check if current data matches the target path
+  const isDataForCorrectPath = useMemo(() => {
+    if (targetFolderPath === '/') {
+      return currentFolderId === null
+    }
+    const targetFolderId = pathToIdMap.get(targetFolderPath)
+    return targetFolderId === currentFolderId && targetFolderId !== undefined
+  }, [targetFolderPath, currentFolderId, pathToIdMap])
 
-  // Don't show any content if we're navigating or have path mismatch - only skeleton
+  // show skeleton when we truly have no data to display
+  const showSkeletonContent =
+    isNavigatingToFolder ||
+    (isLoading && currentItems.length === 0 && !isDataForCorrectPath)
+
+  // content when navigating OR when data doesn't match current path
   const shouldHideContent =
-    isNavigatingToFolder || isPathMismatch || _isBuildingPathMapping
+    isNavigatingToFolder || (!isDataForCorrectPath && currentItems.length === 0)
 
   // error state
   if (isError) {
@@ -755,11 +598,14 @@ export function FileListContainer({
                       key={folder.resource_id}
                       type="button"
                       className="flex flex-col items-center p-3 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors group"
-                      onClick={() => handleFolderNavigate(folder)}
+                      onClick={() => handleFolderClick(folder)}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
+                        if (
+                          (e.key === 'Enter' || e.key === ' ') &&
+                          e.isTrusted
+                        ) {
                           e.preventDefault()
-                          handleFolderNavigate(folder)
+                          handleFolderClick(folder)
                         }
                       }}
                       onMouseEnter={() => {
@@ -838,7 +684,7 @@ export function FileListContainer({
                 </div>
               </div>
             ) : (
-              !isPathMismatch &&
+              isDataForCorrectPath &&
               filteredFiles.length > 0 && (
                 <div className="bg-muted/50 border-b border-dashed border-x p-1">
                   {filteredFiles.map((file, i) => {

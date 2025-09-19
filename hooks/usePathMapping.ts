@@ -13,6 +13,8 @@ export function usePathMapping() {
    * @param items
    */
   const updatePathMapping = useCallback((items: File[]) => {
+    if (items.length === 0) return
+
     setPathToIdMap((prev) => {
       const newMap = new Map(prev)
       items.forEach((item) => {
@@ -22,6 +24,13 @@ export function usePathMapping() {
       })
       return newMap
     })
+  }, [])
+
+  /**
+   * add single folder mapping (for immediate navigation)
+   */
+  const addFolderMapping = useCallback((path: string, folderId: string) => {
+    setPathToIdMap((prev) => new Map(prev).set(path, folderId))
   }, [])
 
   /**
@@ -47,6 +56,7 @@ export function usePathMapping() {
     pathToIdMap,
     updatePathMapping,
     getFolderIdFromPath,
+    addFolderMapping,
     clearPathMapping,
   }
 }
