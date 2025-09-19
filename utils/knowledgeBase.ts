@@ -13,8 +13,12 @@ export function isValidKnowledgeBaseId(
 ): boolean {
   if (!knowledgeBaseId) return false
 
-  // common invalid/placeholder knowledge base IDs
-  const invalidIds = ['null', 'undefined']
+  // Common invalid/placeholder knowledge base IDs
+  const invalidIds = [
+    '00000000-0000-0000-0000-000000000000',
+    'null',
+    'undefined',
+  ]
 
   return !invalidIds.includes(knowledgeBaseId)
 }
