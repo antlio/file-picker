@@ -24,6 +24,14 @@ export interface File {
   indexedStatus: IndexedStatus
   status?: string
   knowledge_base_id?: string
+  dataloader_metadata?: {
+    created_at: string
+    created_by: string
+    last_modified_at: string
+    last_modified_by: string
+    path: string
+    web_url: string
+  }
 }
 
 /**
