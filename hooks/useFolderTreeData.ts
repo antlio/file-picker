@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useFolderListing } from '@/hooks/useFolderListing'
+import { usePathMapping } from '@/hooks/usePathMapping'
 import type { File, SearchSortParams } from '@/lib/types'
 
 export interface UseFolderTreeDataOptions {
@@ -10,7 +11,6 @@ export interface UseFolderTreeDataOptions {
 
 export interface FolderTreeData {
   folderDataCache: Map<string | null, File[]>
-  pathToIdMap: Map<string, string>
   currentFolderId: string | null
   rootItems: File[]
   isLoadingRoot: boolean
@@ -29,12 +29,9 @@ export function useFolderTreeData({
   const [folderDataCache, setFolderDataCache] = useState<
     Map<string | null, File[]>
   >(new Map())
-  const [pathToIdMap, setPathToIdMap] = useState<Map<string, string>>(new Map())
 
-  const currentFolderId =
-    currentFolderPath === '/'
-      ? null
-      : pathToIdMap.get(currentFolderPath) || null
+  const { updatePathMapping, getFolderIdFromPath } = usePathMapping()
+  const currentFolderId = getFolderIdFromPath(currentFolderPath)
 
   // fetch root folder data
   const { items: rootItems, isLoading: isLoadingRoot } = useFolderListing(
@@ -42,22 +39,6 @@ export function useFolderTreeData({
     null,
     searchParams,
   )
-
-  /**
-   * update path-to-id mapping for folders
-   * @param items - folder items to map
-   */
-  const updatePathMapping = useCallback((items: File[]) => {
-    setPathToIdMap((prev) => {
-      const newMap = new Map(prev)
-      items.forEach((item) => {
-        if (item.inode_type === 'directory' && item.inode_path?.path) {
-          newMap.set(`/${item.inode_path.path}`, item.resource_id)
-        }
-      })
-      return newMap
-    })
-  }, [])
 
   // cache root items and update path mapping
   useEffect(() => {
@@ -114,7 +95,6 @@ export function useFolderTreeData({
 
   return {
     folderDataCache,
-    pathToIdMap,
     currentFolderId,
     rootItems,
     isLoadingRoot,

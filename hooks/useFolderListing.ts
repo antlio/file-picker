@@ -2,22 +2,7 @@ import { useEffect, useRef } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { getDefaultAuthHeaders, listResources } from '@/lib/api'
 import type { SearchSortParams } from '@/lib/types'
-
-/**
- * generate consistent cache key for folder listing
- */
-function generateCacheKey(
-  connectionId: string,
-  resourceId: string | null,
-  params: SearchSortParams,
-) {
-  const normalizedParams = {
-    q: params.q || '',
-    sort: params.sort || '',
-    order: params.order || '',
-  }
-  return `drive|${connectionId}|${resourceId || 'root'}|${JSON.stringify(normalizedParams)}`
-}
+import { generateFolderCacheKey } from '@/utils/cache-keys'
 
 /**
  * fetch folder listing with persistent caching and navigation-aware strategy
@@ -36,7 +21,7 @@ export function useFolderListing(
 
   // create consistent key for swr caching
   const key = connectionId
-    ? generateCacheKey(connectionId, resourceId, params)
+    ? generateFolderCacheKey(connectionId, resourceId, params)
     : null
 
   const { data, error, isLoading, mutate, isValidating } = useSWR(
@@ -111,7 +96,7 @@ export function usePrefetchFolder() {
     resourceId: string,
     params: SearchSortParams = {},
   ) => {
-    const key = generateCacheKey(connectionId, resourceId, params)
+    const key = generateFolderCacheKey(connectionId, resourceId, params)
     const headers = await getDefaultAuthHeaders()
 
     // prefetch without triggering revalidation, store in cache for future use
