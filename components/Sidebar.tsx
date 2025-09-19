@@ -110,6 +110,7 @@ export function Sidebar({
                         onClick={handleSync}
                         disabled={isSyncing}
                         className="h-6 w-6 p-0 ml-2"
+                        aria-label="Sync"
                       >
                         <RotateCcw
                           className={`h-2 w-2 ${isSyncing ? 'animate-spin' : ''}`}
