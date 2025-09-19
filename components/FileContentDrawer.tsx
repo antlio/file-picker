@@ -279,9 +279,9 @@ export function FileContentDrawer({
   return (
     <div
       className={`
-      w-96 bg-background border-l border-border flex flex-col
-      transition-width duration-150 ease-in-out
-      ${isOpen ? 'translate-x-0' : 'translate-x-full'}
+      bg-background border-l border-border flex flex-col
+      transition-translate duration-150 ease-in-out
+      ${isOpen ? 'w-96 translate-x-0' : 'w-0 translate-x-full'}
     `}
     >
       {/* header */}
