@@ -230,6 +230,7 @@ const TreeNode = ({
 }: TreeNodeProps) => {
   const hasChildren = item.children && item.children.length > 0
   const isSelected = selectedItemId === item.id
+  const isExpanded = expandedItemIds.includes(item.id)
 
   const Icon = item.icon || (hasChildren ? FolderIcon : ItemIcon)
 
@@ -244,9 +245,8 @@ const TreeNode = ({
       <button
         type="button"
         className={cn(
-          'flex cursor-pointer items-center py-2 px-2 before:right-1 group hover:before:opacity-100 before:absolute before:left-0 before:w-full before:opacity-0 before:bg-muted/80 before:h-[1.75rem] before:-z-10 w-full text-left',
-          isSelected &&
-            'before:opacity-100 before:bg-accent/70 text-accent-foreground',
+          'flex cursor-pointer items-center px-2 py-1.5 before:right-1 group hover:before:opacity-100 before:absolute before:left-0 before:w-full before:opacity-0 before:bg-muted/80 before:h-[1.75rem] before:-z-10 w-full text-left rounded-sm',
+          isSelected && 'before:opacity-100 font-medium bg-primary/5',
         )}
         onClick={() => {
           handleSelectChange(item)
@@ -263,9 +263,9 @@ const TreeNode = ({
         {item.actions && <div className="ml-auto">{item.actions}</div>}
       </button>
 
-      {/* Always render children if they exist - no accordion/folding */}
-      {hasChildren && (
-        <ul className="ml-2.5 border-l border-muted pl-2 h-full">
+      {/* render children only when expanded */}
+      {hasChildren && isExpanded && (
+        <ul className="ml-2.5 border-l border-muted pl-2 h-full space-y-1">
           {item.children?.map((child) => (
             <TreeNode
               key={child.id}

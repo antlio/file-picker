@@ -53,7 +53,7 @@ export function ExpandableFolderTree({
       showChildren={true}
       includeHomeIcon={false}
       showHeader={false}
-      className="border-t mt-[53px] w-full"
+      className="border-t mt-[57px] w-full"
     />
   )
 }
