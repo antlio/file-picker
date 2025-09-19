@@ -1,3 +1,4 @@
+import { isValidKnowledgeBaseId } from '@/utils/knowledgeBase'
 import type {
   Connection,
   IndexedStatus,
@@ -20,6 +21,13 @@ const connectionsCache = {
 // cache for knowledge bases to avoid recreating them
 const knowledgeBaseCache = new Map<string, KnowledgeBase>()
 
+// cache for authentication tokens to avoid repeated auth requests
+const authTokenCache = {
+  token: null as string | null,
+  timestamp: 0,
+  ttl: 55 * 60 * 1000,
+}
+
 /**
  * clear all caches (for testing purposes)
  */
@@ -27,6 +35,8 @@ export function clearCaches() {
   connectionsCache.data = null
   connectionsCache.timestamp = 0
   knowledgeBaseCache.clear()
+  authTokenCache.token = null
+  authTokenCache.timestamp = 0
 }
 
 /**
@@ -39,6 +49,17 @@ export async function getAuthHeaders(
   email: string,
   password: string,
 ): Promise<Record<string, string>> {
+  // check if we have a cached token that's still valid
+  const now = Date.now()
+  if (
+    authTokenCache.token &&
+    now - authTokenCache.timestamp < authTokenCache.ttl
+  ) {
+    return {
+      Authorization: `Bearer ${authTokenCache.token}`,
+    }
+  }
+
   const supabaseAuthUrl = 'https://sb.stack-ai.com'
   const anonKey =
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZic3VhZGZxaGtseG9rbWxodHNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NzM0NTg5ODAsImV4cCI6MTk4OTAzNDk4MH0.Xjry9m7oc42_MsLRc1bZhTTzip3srDjJ6fJMkwhXQ9s'
@@ -58,10 +79,19 @@ export async function getAuthHeaders(
   })
 
   if (!response.ok) {
-    throw new Error(`Authentication failed: ${response.statusText}`)
+    const errorText = await response.text()
+
+    throw new Error(
+      `Authentication failed: ${response.statusText} - ${errorText}`,
+    )
   }
 
   const data = await response.json()
+
+  // cache the token
+  authTokenCache.token = data.access_token
+  authTokenCache.timestamp = now
+
   return {
     Authorization: `Bearer ${data.access_token}`,
   }
@@ -121,6 +151,31 @@ export async function listConnections(
 }
 
 /**
+ * get resource metadata by resource IDs
+ * @param connectionId - connection identifier
+ * @param resourceIds - array of resource IDs to get metadata for
+ * @param headers - auth headers
+ * @returns resource metadata
+ */
+export async function getResourceMetadata(
+  connectionId: string,
+  resourceIds: string[],
+  headers: Record<string, string>,
+): Promise<any[]> {
+  const url = new URL(`${BACKEND_URL}/connections/${connectionId}/resources`)
+  url.searchParams.set('resource_ids', resourceIds.join(','))
+
+  const response = await fetch(url.toString(), { headers })
+
+  if (!response.ok) {
+    throw new Error(`Failed to get resource metadata: ${response.statusText}`)
+  }
+
+  const data = await response.json()
+  return Array.isArray(data) ? data : [data]
+}
+
+/**
  * list resources in a connection folder
  * @param connectionId - connection identifier
  * @param resourceId - parent folder resource id (null for root)
@@ -166,12 +221,36 @@ export async function listResources(
 
   const data = await response.json()
 
-  const mappedData = (data.data || data).map((item: any) => ({
-    ...item,
-    indexedStatus: (item.indexedStatus ||
-      item.indexed_status ||
-      'not_indexed') as IndexedStatus,
-  }))
+  const mappedData = (data.data || data).map((item: any) => {
+    let mappedStatus: IndexedStatus = 'not_indexed'
+
+    const status = item.indexedStatus || item.indexed_status || item.status
+
+    // determine status based on knowledge base association and status field
+    const hasValidKnowledgeBase = isValidKnowledgeBaseId(item.knowledge_base_id)
+
+    if (
+      item.indexedStatus === 'indexing' ||
+      item.indexedStatus === 'deindexing'
+    ) {
+      mappedStatus = item.indexedStatus
+    } else if (item.indexedStatus === 'indexed') {
+      mappedStatus = 'indexed'
+    } else if (status === 'indexing' || status === 'pending') {
+      mappedStatus = 'indexing'
+    } else if (status === 'indexed') {
+      mappedStatus = 'indexed'
+    } else if (hasValidKnowledgeBase) {
+      mappedStatus = 'indexed'
+    } else {
+      mappedStatus = 'not_indexed'
+    }
+
+    return {
+      ...item,
+      indexedStatus: mappedStatus,
+    }
+  })
 
   return {
     data: mappedData,
@@ -294,6 +373,7 @@ export async function startIndex(
     jobId: `sync-${kb.knowledge_base_id}`,
     status: 'started',
     message: 'Indexing started successfully',
+    knowledgeBaseId: kb.knowledge_base_id,
   }
 }
 

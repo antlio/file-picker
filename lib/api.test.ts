@@ -231,7 +231,7 @@ describe('API Client', () => {
       )
 
       expect(result.data).toHaveLength(2)
-      expect(result.data[0].name).toBe('Important notes.txt')
+      expect(result.data[0].inode_path.path).toBe('Important notes.txt')
       expect(result.data[1].inode_type).toBe('directory')
       expect(result.nextPageToken).toBe('next-token-123')
     })
