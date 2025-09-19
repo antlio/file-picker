@@ -10,7 +10,8 @@ import { useFileDrawer } from '@/hooks/useFileDrawer'
 export default function HomePage() {
   const [currentFolderPath, setCurrentFolderPath] = useState<string>('/')
   const { selectedConnectionId, handleConnectionSelect } = useConnectionSync()
-  const { handleFileClick, handleCloseDrawer } = useFileDrawer()
+  const { selectedFile, isDrawerOpen, handleFileClick, handleCloseDrawer } =
+    useFileDrawer()
 
   /**
    * handle breadcrumb navigation from TopBar
@@ -40,6 +41,9 @@ export default function HomePage() {
     <FilePickerLayout
       showFolderTree={false}
       onConnectionSelect={handleConnectionSelectWithReset}
+      selectedFile={selectedFile}
+      isDrawerOpen={isDrawerOpen}
+      onCloseDrawer={handleCloseDrawer}
     >
       {/* top bar with breadcrumb navigation */}
       <div className="border-border">

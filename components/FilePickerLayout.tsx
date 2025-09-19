@@ -5,12 +5,17 @@ import { FileContentDrawer } from '@/components/FileContentDrawer'
 import { Sidebar } from '@/components/Sidebar'
 import { useConnectionSync } from '@/hooks/useConnectionSync'
 import { useFileDrawer } from '@/hooks/useFileDrawer'
+import type { File } from '@/lib/types'
 
 interface FilePickerLayoutProps {
   children: ReactNode
   sidebarContent?: ReactNode
   showFolderTree?: boolean
   onConnectionSelect?: (connectionId: string) => void
+  // File drawer props - if provided, use external state instead of internal
+  selectedFile?: File | null
+  isDrawerOpen?: boolean
+  onCloseDrawer?: () => void
 }
 
 /**
@@ -21,6 +26,9 @@ export function FilePickerLayout({
   sidebarContent,
   showFolderTree = false,
   onConnectionSelect,
+  selectedFile: externalSelectedFile,
+  isDrawerOpen: externalIsDrawerOpen,
+  onCloseDrawer: externalOnCloseDrawer,
 }: FilePickerLayoutProps) {
   const {
     selectedConnectionId,
@@ -28,7 +36,22 @@ export function FilePickerLayout({
     handleConnectionSelect,
     handleSync,
   } = useConnectionSync()
-  const { selectedFile, isDrawerOpen, handleCloseDrawer } = useFileDrawer()
+  const {
+    selectedFile: internalSelectedFile,
+    isDrawerOpen: internalIsDrawerOpen,
+    handleCloseDrawer: internalHandleCloseDrawer,
+  } = useFileDrawer()
+
+  // use external file drawer state if provided, otherwise use internal
+  const selectedFile =
+    externalSelectedFile !== undefined
+      ? externalSelectedFile
+      : internalSelectedFile
+  const isDrawerOpen =
+    externalIsDrawerOpen !== undefined
+      ? externalIsDrawerOpen
+      : internalIsDrawerOpen
+  const handleCloseDrawer = externalOnCloseDrawer || internalHandleCloseDrawer
 
   // use custom handlers if provided, otherwise use default hooks
   const connectionSelectHandler = onConnectionSelect || handleConnectionSelect
@@ -49,19 +72,11 @@ export function FilePickerLayout({
         {/* optional folder tree or additional sidebar content */}
         {showFolderTree && sidebarContent && (
           <div className="flex-1 overflow-auto">
-            {selectedConnectionId ? (
-              <Suspense
-                fallback={<div className="p-4">Loading folder tree...</div>}
-              >
-                {sidebarContent}
-              </Suspense>
-            ) : (
-              <div className="p-4 text-center text-muted-foreground">
-                <p className="text-sm">
-                  Select a connection to view folder structure
-                </p>
-              </div>
-            )}
+            <Suspense
+              fallback={<div className="p-4">Loading folder tree...</div>}
+            >
+              {sidebarContent}
+            </Suspense>
           </div>
         )}
       </div>

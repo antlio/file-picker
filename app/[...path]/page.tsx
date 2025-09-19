@@ -24,7 +24,8 @@ export default function PathPage({ params }: PathPageProps) {
   const resolvedParams = use(params)
   const router = useRouter()
   const { selectedConnectionId, handleConnectionSelect } = useConnectionSync()
-  const { handleFileClick } = useFileDrawer()
+  const { selectedFile, isDrawerOpen, handleFileClick, handleCloseDrawer } =
+    useFileDrawer()
   const { params: searchParams } = useSearchSort()
 
   const baseParams = { sort: searchParams.sort, order: searchParams.order }
@@ -57,6 +58,9 @@ export default function PathPage({ params }: PathPageProps) {
       showFolderTree={true}
       sidebarContent={folderTreeContent}
       onConnectionSelect={handleConnectionSelect}
+      selectedFile={selectedFile}
+      isDrawerOpen={isDrawerOpen}
+      onCloseDrawer={handleCloseDrawer}
     >
       {/* top bar */}
       <div>
