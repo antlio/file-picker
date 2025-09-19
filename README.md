@@ -1,36 +1,130 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# File Picker
 
-## Getting Started
+![File Picker Interface](./docs/file-picker-interface.png)
 
-First, run the development server:
+## [stack]
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Next.js 15.5.3** - React framework with App Router and Turbopack
+- **TypeScript** - Type safety and developer experience
+- **Tailwind CSS** - Utility-first styling
+- **SWR v2** - Data fetching with intelligent caching
+- **Radix UI** - Accessible component primitives
+- **shadcn/ui** - Pre-built component system
+- **Sonner** - Toast notifications
+- **Lucide React** - Icon library
+
+### [architecture + design]
+
+1. **modular**
+```
+components/
+├── FileList/           # File listing and row components
+├── ui/                # shadcn/ui base components
+├── FilePickerLayout.tsx # Shared layout component
+├── Sidebar.tsx        # Connection management
+└── FileContentDrawer.tsx # File preview drawer
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**why**: promotes reusability, maintainability, and follows single responsibility principle.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+2. **custom hooks pattern**
+```
+hooks/
+├── useConnectionSync.ts  # Connection state management
+├── useFileDrawer.ts     # Drawer state management
+├── useFolderListing.ts  # Data fetching with SWR
+├── usePathMapping.ts    # Path-to-ID mapping
+└── useSearchSort.ts     # Search and sort state
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**why**: Separates business logic from ui, and promotes code reuse.
 
-## Learn More
+3. **optimistic ui**
+- immediate visual feedback for user actions
+- automatic rollback on API errors
+- smart cache invalidation with SWR
 
-To learn more about Next.js, take a look at the following resources:
+**Why**: provides responsive feel, reduces perceived latency, and improves user experience.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4. **caching**
+```typescript
+// Cache key pattern: ['drive', connectionId, folderId, { sort, q, pageToken }]
+const key = generateFolderCacheKey(connectionId, resourceId, params)
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**Why**: consistent cache keys to reduce API calls.
 
-## Deploy on Vercel
+5. **accessibility**
+- semantic HTML elements
+- ARIA labels and roles
+- keyboard navigation support
+- screen reader compatibility
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+**Why**: inclusive design, legal compliance, and better user experience for all users.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### [getting started]
+
+**prerequisites**
+- Node.js 18+
+- pnpm (recommended) or npm
+
+***installation**
+
+1. **clone the repository**
+```bash
+git clone <repository-url>
+cd file-picker
+```
+
+2. **install dependencies**
+```bash
+pnpm install
+```
+
+3. **environment setup**
+Create a `.env.local` file with your StackAI credentials:
+```bash
+NEXT_PUBLIC_STACKAI_EMAIL='your-email@example.com'
+NEXT_PUBLIC_STACKAI_PASSWORD='your-password'
+```
+
+4. **run the development server**
+```bash
+# development
+pnpm dev          # start development server
+pnpm build        # build for production
+pnpm start        # start production server
+
+# code Quality
+pnpm lint         # run Biome linter
+pnpm format       # format code with Biome
+pnpm type-check   # run TypeScript type checking
+
+# testing
+pnpm test         # run unit tests
+pnpm test:watch   # run tests in watch mode
+```
+
+5. **Open your browser**
+Navigate to `http://localhost:3000`
+
+### [api]
+The app uses StackAI endpoints for Google Drive integration. Update the API configuration in:
+- `lib/api.ts` - API client implementation
+- `jupyter.ipynb` - Contains actual endpoint documentation
+
+### [testing]
+
+```bash
+# Run tests
+pnpm test
+
+# Watch mode during development
+pnpm test:watch
+```
+
+### [known limitations]
+
+1. **large folders**: consider implementing virtualization
+2. **file size**: large file previews may impact performance
+4. **browser support**: optimized for modern browsers (ES2020+)
