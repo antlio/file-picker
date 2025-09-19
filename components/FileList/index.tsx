@@ -43,9 +43,19 @@ function AnimatedCounter({
   duration?: number
 }) {
   const [displayValue, setDisplayValue] = useState(0)
+  const [hasStarted, setHasStarted] = useState(false)
 
   useEffect(() => {
-    if (value === displayValue) return
+    if (!hasStarted && value > 0) {
+      const startDelay = setTimeout(() => {
+        setHasStarted(true)
+      }, 100)
+      return () => clearTimeout(startDelay)
+    }
+  }, [value, hasStarted])
+
+  useEffect(() => {
+    if (!hasStarted || value === displayValue) return
 
     const startTime = Date.now()
     const startValue = displayValue
@@ -69,7 +79,7 @@ function AnimatedCounter({
     }
 
     requestAnimationFrame(animate)
-  }, [value, duration, displayValue])
+  }, [value, duration, displayValue, hasStarted])
 
   return (
     <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-[3px] font-mono tabular-nums transition-all duration-150">
@@ -405,27 +415,37 @@ export function FileListContainer({
   }, [filteredItems])
 
   /**
-   * handle folder navigation (optimistic - navigate immediately, show skeleton while loading)
+   * handle folder navigation with optimistic caching
    */
   const handleFolderNavigate = useCallback(
-    (folder: File) => {
+    async (folder: File) => {
       const folderPath = folder.inode_path?.path
         ? `/${folder.inode_path.path}`
         : `/${folder.resource_id}`
 
+      // immediately update path mapping
       setPathToIdMap((prev) =>
         new Map(prev).set(folderPath, folder.resource_id),
       )
 
+      // prefetch the folder contents before navigating
+      if (connectionId) {
+        try {
+          await prefetch(connectionId, folder.resource_id, baseParams)
+        } catch (error) {
+          console.warn('Failed to prefetch folder contents:', error)
+        }
+      }
+
       setIsNavigatingToFolder(true)
 
-      // navigate
+      // navigate immediately
       setCurrentFolderId(folder.resource_id)
       setCurrentFolderPath(folderPath)
       setSelectedItems(new Set())
       updateURL(folderPath)
     },
-    [updateURL],
+    [updateURL, connectionId, baseParams, prefetch],
   )
 
   /**
@@ -593,10 +613,17 @@ export function FileListContainer({
   const targetFolderPath =
     decodedPathSegments.length > 0 ? `/${decodedPathSegments.join('/')}` : '/'
   const isPathMismatch = targetFolderPath !== currentFolderPath
+
+  // Show skeleton during navigation or path mismatch to avoid showing wrong content
   const showSkeletonContent =
     (isLoading && currentItems.length === 0) ||
     isNavigatingToFolder ||
-    isPathMismatch
+    isPathMismatch ||
+    _isBuildingPathMapping
+
+  // Don't show any content if we're navigating or have path mismatch - only skeleton
+  const shouldHideContent =
+    isNavigatingToFolder || isPathMismatch || _isBuildingPathMapping
 
   // error state
   if (isError) {
@@ -717,8 +744,8 @@ export function FileListContainer({
       <div className="h-[calc(100dvh-153px)] overflow-auto">
         <div className="bg-[image:radial-gradient(circle,_var(--color-border)_0.5px,_transparent_0.5px)] bg-[size:2.5px_2.5px] bg-[position:0px_0px] px-1.5">
           {/* folders section */}
-          {!showSkeletonContent &&
-            !isPathMismatch &&
+          {!shouldHideContent &&
+            !showSkeletonContent &&
             filteredFolders.length > 0 && (
               <div className="bg-white border-x border-border flex flex-col gap-2 px-6 py-4">
                 <h2 className="text-xl font-medium">Folders</h2>
