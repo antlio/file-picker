@@ -1,7 +1,15 @@
 import * as AccordionPrimitive from '@radix-ui/react-accordion'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { ChevronRight, type LucideIcon } from 'lucide-react'
-import * as React from 'react'
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+import { usePrefetchFolder } from '@/hooks/useFolderListing'
 
 import { cn } from '@/lib/utils'
 
@@ -24,9 +32,13 @@ type TreeProps = React.HTMLAttributes<HTMLDivElement> & {
   data: TreeDataItem[] | TreeDataItem
   initialSelectedItemId?: string
   onSelectChange?: (item: TreeDataItem | undefined) => void
+  onNavigate?: (folderPath: string, folderId: string | null) => void
+  onPrefetch?: (folderId: string) => void
   expandAll?: boolean
   folderIcon?: LucideIcon
   itemIcon?: LucideIcon
+  connectionId?: string | null
+  searchParams?: Record<string, string | undefined>
 } & VariantProps<typeof treeVariants>
 
 const useTree = ({
@@ -36,11 +48,16 @@ const useTree = ({
   initialSelectedItemId?: string
   onSelectChange?: (item: TreeDataItem | undefined) => void
 }) => {
-  const [selectedItemId, setSelectedItemId] = React.useState<
-    string | undefined
-  >(initialSelectedItemId)
+  const [selectedItemId, setSelectedItemId] = useState<string | undefined>(
+    initialSelectedItemId,
+  )
 
-  const handleSelectChange = React.useCallback(
+  // selected item when initialSelectedItemId changes
+  useEffect(() => {
+    setSelectedItemId(initialSelectedItemId)
+  }, [initialSelectedItemId])
+
+  const handleSelectChange = useCallback(
     (item: TreeDataItem | undefined) => {
       setSelectedItemId(item?.id)
       if (onSelectChange) {
@@ -56,15 +73,19 @@ const useTree = ({
   }
 }
 
-const Tree = React.forwardRef<HTMLDivElement, TreeProps>(
+const Tree = forwardRef<HTMLDivElement, TreeProps>(
   (
     {
       data,
       initialSelectedItemId,
       onSelectChange,
+      onNavigate,
+      onPrefetch,
       expandAll,
       folderIcon,
       itemIcon,
+      connectionId,
+      searchParams,
       className,
       ...props
     },
@@ -75,7 +96,7 @@ const Tree = React.forwardRef<HTMLDivElement, TreeProps>(
       onSelectChange,
     })
 
-    const getAllItemIds = React.useCallback(
+    const getAllItemIds = useCallback(
       (items: TreeDataItem[] | TreeDataItem): string[] => {
         const ids: string[] = []
 
@@ -98,12 +119,15 @@ const Tree = React.forwardRef<HTMLDivElement, TreeProps>(
       [],
     )
 
-    const expandedItemIds = React.useMemo(() => {
-      if (!initialSelectedItemId) {
-        return [] as string[]
-      }
-
+    const expandedItemIds = useMemo(() => {
       const ids: string[] = []
+
+      // expand root node to show its children
+      ids.push('root')
+
+      if (!initialSelectedItemId) {
+        return ids
+      }
 
       function walkTreeItems(
         items: TreeDataItem[] | TreeDataItem,
@@ -147,6 +171,10 @@ const Tree = React.forwardRef<HTMLDivElement, TreeProps>(
           expandedItemIds={expandedItemIds}
           FolderIcon={folderIcon}
           ItemIcon={itemIcon}
+          onNavigate={onNavigate}
+          onPrefetch={onPrefetch}
+          connectionId={connectionId}
+          searchParams={searchParams}
           {...props}
         />
       </div>
@@ -162,9 +190,13 @@ type TreeItemProps = TreeProps & {
   expandedItemIds: string[]
   FolderIcon?: LucideIcon
   ItemIcon?: LucideIcon
+  onNavigate?: (folderPath: string, folderId: string | null) => void
+  onPrefetch?: (folderId: string) => void
+  connectionId?: string | null
+  searchParams?: Record<string, string | undefined>
 }
 
-const TreeItem = React.forwardRef<HTMLDivElement, TreeItemProps>(
+const TreeItem = forwardRef<HTMLDivElement, TreeItemProps>(
   (
     {
       className,
@@ -174,6 +206,10 @@ const TreeItem = React.forwardRef<HTMLDivElement, TreeItemProps>(
       expandedItemIds,
       FolderIcon,
       ItemIcon,
+      onNavigate,
+      onPrefetch,
+      connectionId,
+      searchParams,
       ...props
     },
     ref,
@@ -191,6 +227,10 @@ const TreeItem = React.forwardRef<HTMLDivElement, TreeItemProps>(
                 handleSelectChange={handleSelectChange}
                 FolderIcon={FolderIcon}
                 ItemIcon={ItemIcon}
+                onNavigate={onNavigate}
+                onPrefetch={onPrefetch}
+                connectionId={connectionId}
+                searchParams={searchParams}
               />
             ))
           ) : (
@@ -201,6 +241,10 @@ const TreeItem = React.forwardRef<HTMLDivElement, TreeItemProps>(
               handleSelectChange={handleSelectChange}
               FolderIcon={FolderIcon}
               ItemIcon={ItemIcon}
+              onNavigate={onNavigate}
+              onPrefetch={onPrefetch}
+              connectionId={connectionId}
+              searchParams={searchParams}
             />
           )}
         </ul>
@@ -218,6 +262,10 @@ interface TreeNodeProps {
   handleSelectChange: (item: TreeDataItem | undefined) => void
   FolderIcon?: LucideIcon
   ItemIcon?: LucideIcon
+  onNavigate?: (folderPath: string, folderId: string | null) => void
+  onPrefetch?: (folderId: string) => void
+  connectionId?: string | null
+  searchParams?: Record<string, string | undefined>
 }
 
 const TreeNode = ({
@@ -227,12 +275,59 @@ const TreeNode = ({
   handleSelectChange,
   FolderIcon,
   ItemIcon,
+  onNavigate,
+  onPrefetch,
+  connectionId,
+  searchParams,
 }: TreeNodeProps) => {
   const hasChildren = item.children && item.children.length > 0
   const isSelected = selectedItemId === item.id
   const isExpanded = expandedItemIds.includes(item.id)
 
   const Icon = item.icon || (hasChildren ? FolderIcon : ItemIcon)
+
+  // Use SWR prefetch for better caching integration
+  const { prefetch: swrPrefetch } = usePrefetchFolder()
+  const prefetchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Handle hover prefetching using SWR
+  const handleMouseEnter = useCallback(() => {
+    // Prefetch any folder that's not root using SWR
+    if (connectionId && item.id !== 'root') {
+      // Clear any existing timeout
+      if (prefetchTimeoutRef.current) {
+        clearTimeout(prefetchTimeoutRef.current)
+      }
+      // Set new timeout for SWR prefetch
+      prefetchTimeoutRef.current = setTimeout(async () => {
+        try {
+          await swrPrefetch(connectionId, item.id, searchParams || {})
+          // Also call the legacy onPrefetch if provided for backward compatibility
+          onPrefetch?.(item.id)
+        } catch (error) {
+          console.warn('SWR prefetch failed for folder:', item.id, error)
+        }
+        prefetchTimeoutRef.current = null
+      }, 150)
+    }
+  }, [swrPrefetch, connectionId, item.id, searchParams, onPrefetch])
+
+  const handleMouseLeave = useCallback(() => {
+    // Clear any pending prefetch
+    if (prefetchTimeoutRef.current) {
+      clearTimeout(prefetchTimeoutRef.current)
+      prefetchTimeoutRef.current = null
+    }
+  }, [])
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (prefetchTimeoutRef.current) {
+        clearTimeout(prefetchTimeoutRef.current)
+      }
+    }
+  }, [])
 
   return (
     <li
@@ -250,8 +345,24 @@ const TreeNode = ({
         )}
         onClick={() => {
           handleSelectChange(item)
-          item.onClick?.()
+
+          // Always try onNavigate first for better navigation handling
+          if (onNavigate) {
+            // Handle special case for root
+            const folderPath =
+              item.id === 'root'
+                ? '/'
+                : item.name.startsWith('/')
+                  ? item.name
+                  : `/${item.name}`
+            onNavigate(folderPath, item.id === 'root' ? null : item.id)
+          } else {
+            // Fallback to original onClick
+            item.onClick?.()
+          }
         }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
         {Icon && (
           <Icon
@@ -275,6 +386,10 @@ const TreeNode = ({
               handleSelectChange={handleSelectChange}
               FolderIcon={FolderIcon}
               ItemIcon={ItemIcon}
+              onNavigate={onNavigate}
+              onPrefetch={onPrefetch}
+              connectionId={connectionId}
+              searchParams={searchParams}
             />
           ))}
         </ul>
@@ -283,7 +398,7 @@ const TreeNode = ({
   )
 }
 
-const AccordionTrigger = React.forwardRef<
+const AccordionTrigger = forwardRef<
   React.ComponentRef<typeof AccordionPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Trigger>
 >(({ className, children, ...props }, ref) => (
@@ -303,7 +418,7 @@ const AccordionTrigger = React.forwardRef<
 ))
 AccordionTrigger.displayName = AccordionPrimitive.Trigger.displayName
 
-const AccordionContent = React.forwardRef<
+const AccordionContent = forwardRef<
   React.ComponentRef<typeof AccordionPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Content>
 >(({ className, children, ...props }, ref) => (

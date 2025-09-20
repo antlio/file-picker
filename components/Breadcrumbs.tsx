@@ -98,29 +98,33 @@ export function Breadcrumbs({
       className={`flex items-center space-x-1 ${className}`}
       aria-label="Breadcrumb"
     >
-      {breadcrumbs.map((item, index) => (
-        <div key={item.path} className="flex items-center space-x-1">
-          {index > 0 && (
-            <ChevronRight className="h-4 w-4 mt-0.5 text-muted-foreground" />
-          )}
+      {breadcrumbs.map((item, index) => {
+        const isDisabled = index === breadcrumbs.length - 1
 
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-auto px-0.75 py-1 font-medium hover:bg-transparent opacity-50 hover:opacity-100 disabled:opacity-100"
-            onClick={() => handleBreadcrumbClick(item.path)}
-            disabled={index === breadcrumbs.length - 1}
-          >
-            {item.isRoot ? (
-              <div className="flex items-center space-x-1">
-                <span>{item.name}</span>
-              </div>
-            ) : (
-              <span className="max-w-[200px] truncate">{item.name}</span>
+        return (
+          <div key={item.path} className="flex items-center space-x-1">
+            {index > 0 && (
+              <ChevronRight className="h-4 w-4 mt-0.5 text-muted-foreground" />
             )}
-          </Button>
-        </div>
-      ))}
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-auto px-0.75 py-1 font-medium hover:bg-transparent opacity-50 hover:opacity-100 disabled:opacity-100"
+              onClick={() => handleBreadcrumbClick(item.path)}
+              disabled={isDisabled}
+            >
+              {item.isRoot ? (
+                <div className="flex items-center space-x-1">
+                  <span>{item.name}</span>
+                </div>
+              ) : (
+                <span className="max-w-[200px] truncate">{item.name}</span>
+              )}
+            </Button>
+          </div>
+        )
+      })}
     </nav>
   )
 }

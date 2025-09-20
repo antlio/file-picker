@@ -7,6 +7,8 @@ interface FolderTreeProps {
   connectionId: string | null
   currentFolderPath: string
   onFolderSelect: (folderPath: string) => void
+  onNavigate?: (folderPath: string, folderId: string | null) => void
+  onPrefetch?: (folderId: string) => void
   searchParams?: SearchSortParams
 }
 
@@ -18,6 +20,8 @@ export function FolderTree({
   connectionId,
   currentFolderPath,
   onFolderSelect,
+  onNavigate,
+  onPrefetch,
   searchParams = {},
 }: FolderTreeProps) {
   return (
@@ -25,6 +29,8 @@ export function FolderTree({
       connectionId={connectionId}
       currentFolderPath={currentFolderPath}
       onFolderSelect={onFolderSelect}
+      onNavigate={onNavigate}
+      onPrefetch={onPrefetch}
       searchParams={searchParams}
       showChildren={true}
       includeHomeIcon={true}
@@ -42,6 +48,8 @@ export function ExpandableFolderTree({
   connectionId,
   currentFolderPath,
   onFolderSelect,
+  onNavigate,
+  onPrefetch,
   searchParams = {},
 }: FolderTreeProps) {
   return (
@@ -49,6 +57,8 @@ export function ExpandableFolderTree({
       connectionId={connectionId}
       currentFolderPath={currentFolderPath}
       onFolderSelect={onFolderSelect}
+      onNavigate={onNavigate}
+      onPrefetch={onPrefetch}
       searchParams={searchParams}
       showChildren={true}
       includeHomeIcon={false}

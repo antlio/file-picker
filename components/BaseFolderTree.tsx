@@ -12,6 +12,8 @@ export interface BaseFolderTreeProps {
   connectionId: string | null
   currentFolderPath: string
   onFolderSelect: (folderPath: string) => void
+  onNavigate?: (folderPath: string, folderId: string | null) => void
+  onPrefetch?: (folderId: string) => void
   searchParams?: SearchSortParams
   showChildren?: boolean
   includeHomeIcon?: boolean
@@ -43,8 +45,9 @@ export function BaseFolderTree({
   connectionId,
   currentFolderPath,
   onFolderSelect,
+  onNavigate,
+  onPrefetch,
   searchParams = {},
-  showChildren = true,
   includeHomeIcon = true,
   showHeader = false,
   className = '',
@@ -66,15 +69,9 @@ export function BaseFolderTree({
       currentFolderId,
       currentFolderPath,
       onFolderSelect,
-      showChildren,
+      true, // Always show children to keep tree displayed at all levels
     )
-  }, [
-    folderDataCache,
-    currentFolderId,
-    currentFolderPath,
-    onFolderSelect,
-    showChildren,
-  ])
+  }, [folderDataCache, currentFolderId, currentFolderPath, onFolderSelect])
 
   /**
    * create complete tree with root node
@@ -99,6 +96,21 @@ export function BaseFolderTree({
     [onFolderSelect],
   )
 
+  // Determine the selected item ID (must be before any early returns)
+  const selectedItemId = useMemo(() => {
+    if (currentFolderPath === '/') {
+      return 'root'
+    }
+
+    // subfolders use the currentFolderId
+    if (currentFolderId) {
+      return currentFolderId
+    }
+
+    // fallback: folder id from the path mapping
+    return undefined
+  }, [currentFolderPath, currentFolderId])
+
   // show loading state while fetching root data
   if (isLoadingRoot && !rootItems.length) {
     return <FolderTreeSkeleton />
@@ -107,13 +119,16 @@ export function BaseFolderTree({
   const treeComponent = (
     <Tree
       data={treeData}
-      initialSelectedItemId={
-        currentFolderPath === '/' ? 'root' : currentFolderPath
-      }
+      initialSelectedItemId={selectedItemId}
       onSelectChange={handleTreeSelect}
+      onNavigate={onNavigate}
+      onPrefetch={onPrefetch}
       folderIcon={Folder}
       itemIcon={Folder}
       className={className}
+      expandAll={false}
+      connectionId={connectionId}
+      searchParams={searchParams as Record<string, string | undefined>}
       key={connectionId}
     />
   )
