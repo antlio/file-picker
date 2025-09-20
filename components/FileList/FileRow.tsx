@@ -146,16 +146,30 @@ export const FileRow = memo(function FileRow({
       onMouseLeave={handleMouseLeave}
     >
       <div className="relative flex flex-shrink-0 items-center w-6 h-6">
-        {shouldShowCheckbox ? (
+        <div
+          className={`absolute inset-0 flex items-center justify-center transition-all duration-100 ${
+            shouldShowCheckbox
+              ? 'opacity-0 blur-sm scale-50'
+              : 'opacity-100 blur-0 scale-100'
+          }`}
+        >
+          {getFileIcon()}
+        </div>
+
+        <div
+          className={`absolute inset-0 flex items-center justify-center transition-all duration-100 ${
+            shouldShowCheckbox
+              ? 'opacity-100 blur-0 scale-100'
+              : 'opacity-0 blur-sm scale-90'
+          }`}
+        >
           <Checkbox
             checked={isSelected}
             onCheckedChange={handleSelectChange}
             onClick={(e) => e.stopPropagation()}
             className="relative flex-shrink-0"
           />
-        ) : (
-          getFileIcon()
-        )}
+        </div>
       </div>
 
       {/* name */}
@@ -179,25 +193,30 @@ export const FileRow = memo(function FileRow({
       </div>
 
       {/* cta */}
-      {isHovered && (
-        <div
-          className="absolute right-0 top-0 bottom-0 flex items-center bg-muted/50 pl-20 rounded-r-lg"
-          style={{
-            background:
-              'linear-gradient(to right, transparent 0%, var(--muted) 30%, var(--muted) 100%)',
-          }}
-        >
-          <div className="px-2">
-            <IndexButton
-              status={item.indexedStatus}
-              isFolder={isFolder}
-              onIndex={onIndex}
-              onDeindex={onDeindex}
-              onRemove={onRemove}
-            />
+      {isHovered &&
+        item.indexedStatus !== 'indexing' &&
+        item.indexedStatus !== 'deindexing' && (
+          // biome-ignore lint/a11y/noStaticElementInteractions: required for interaction
+          // biome-ignore lint/a11y/useKeyWithClickEvents: only prevents event bubbling
+          <div
+            className="absolute right-0 top-0 bottom-0 flex items-center bg-muted/50 pl-20 rounded-r-lg"
+            style={{
+              background:
+                'linear-gradient(to right, transparent 0%, var(--muted) 30%, var(--muted) 100%)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-2">
+              <IndexButton
+                status={item.indexedStatus}
+                isFolder={isFolder}
+                onIndex={onIndex}
+                onDeindex={onDeindex}
+                onRemove={onRemove}
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )}
     </div>
   )
 

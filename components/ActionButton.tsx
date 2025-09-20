@@ -29,7 +29,8 @@ export function IndexButton({
   /**
    * handle index action with loading state
    */
-  const handleIndex = async () => {
+  const handleIndex = async (e: React.MouseEvent) => {
+    e.stopPropagation()
     if (!onIndex || isLoading || disabled) return
 
     try {
@@ -45,7 +46,8 @@ export function IndexButton({
   /**
    * handle deindex action with loading state
    */
-  const handleDeindex = async () => {
+  const handleDeindex = async (e: React.MouseEvent) => {
+    e.stopPropagation()
     if (!onDeindex || isLoading || disabled) return
 
     try {
@@ -62,7 +64,9 @@ export function IndexButton({
   switch (status) {
     case 'not_indexed':
       return (
-        <div className="flex space-x-1">
+        // biome-ignore lint/a11y/noStaticElementInteractions: required for interaction
+        // biome-ignore lint/a11y/useKeyWithClickEvents: only prevents event bubbling
+        <div className="flex space-x-1" onClick={(e) => e.stopPropagation()}>
           <Button
             size={size}
             onClick={handleIndex}
@@ -76,14 +80,16 @@ export function IndexButton({
 
     case 'indexing':
       return (
-        <div className="flex space-x-1">
+        // biome-ignore lint/a11y/noStaticElementInteractions: required for interaction
+        // biome-ignore lint/a11y/useKeyWithClickEvents: only prevents event bubbling
+        <div className="flex space-x-1" onClick={(e) => e.stopPropagation()}>
           <Button
             size={size}
             variant="secondary"
             disabled
             className="bg-blue-100 text-blue-800"
           >
-            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+            <Loader2 className="h-2 w-2 mr-1 animate-spin" />
             Indexing
           </Button>
         </div>
@@ -91,7 +97,9 @@ export function IndexButton({
 
     case 'indexed':
       return (
-        <div className="flex space-x-1">
+        // biome-ignore lint/a11y/noStaticElementInteractions: required for interaction
+        // biome-ignore lint/a11y/useKeyWithClickEvents: only prevents event bubbling
+        <div className="flex space-x-1" onClick={(e) => e.stopPropagation()}>
           <Button
             size={size}
             variant="outline"

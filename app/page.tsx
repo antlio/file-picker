@@ -10,7 +10,7 @@ import { useFileDrawer } from '@/hooks/useFileDrawer'
 import { useSearchSort } from '@/hooks/useSearchSort'
 import { useNavigationStore } from '@/store/navigationStore'
 
-export default function HomePage() {
+function HomePageContent() {
   const { selectedConnectionId, handleConnectionSelect } = useConnectionSync()
   const { selectedFile, isDrawerOpen, handleFileClick, handleCloseDrawer } =
     useFileDrawer()
@@ -119,4 +119,8 @@ export default function HomePage() {
       </div>
     </FilePickerLayout>
   )
+}
+
+export default function HomePage() {
+  return <HomePageContent />
 }
