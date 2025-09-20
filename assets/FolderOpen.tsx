@@ -1,6 +1,93 @@
-export default function FolderOpen() {
+interface FolderOpenProps {
+  mousePosition?: { x: number; y: number } | null
+  containerBounds?: { width: number; height: number } | null
+  isHovered?: boolean
+}
+
+export default function FolderOpen({
+  mousePosition,
+  containerBounds,
+  isHovered = false,
+}: FolderOpenProps = {}) {
   // Generate unique IDs for this instance to avoid conflicts when multiple icons are rendered
   const uid = Math.random().toString(36).substring(2, 11)
+
+  // Calculate unstacking transforms for each layer
+  const getLayerTransform = (layerType: 'b' | 'c' | 'd') => {
+    if (!isHovered) {
+      // layer 'd' as the reference position
+      const targetY = 6.426
+
+      switch (layerType) {
+        case 'b': {
+          const bOriginalY = 4.922
+          return `translateY(${targetY - bOriginalY}px)`
+        }
+        case 'c': {
+          const cOriginalY = 5.566
+          return `translateY(${targetY - cOriginalY}px)`
+        }
+        case 'd':
+          return 'translateY(0px)'
+        default:
+          return 'translateY(0px)'
+      }
+    } else {
+      // When hovered, return to natural positions (unstacked)
+      return 'translateY(0px)'
+    }
+  }
+
+  // position for the orange stroke element based on mouse position
+  const getStrokePosition = () => {
+    let baseY = 5.91
+
+    // adjust Y position based on stacking state - follow layer 'c'
+    if (!isHovered) {
+      const cOriginalY = 5.566
+      const targetY = 6.426
+      baseY = 5.91 + (targetY - cOriginalY)
+    }
+
+    if (!mousePosition || !containerBounds) {
+      return { x: 2.57, y: baseY }
+    }
+
+    const folderContentWidth = 13
+    const folderStartX = 1
+
+    // mouse position to folder content area
+    const normalizedX = Math.max(
+      0,
+      Math.min(1, mousePosition.x / containerBounds.width),
+    )
+
+    // svg coordinates within the folder content area
+    const strokeX = folderStartX + normalizedX * folderContentWidth
+
+    return { x: strokeX, y: baseY }
+  }
+
+  // rotation based on position
+  const getStrokeRotation = () => {
+    if (!mousePosition || !containerBounds) {
+      return 0
+    }
+
+    // normalize position (0 = left, 1 = right)
+    const normalizedX = Math.max(
+      0,
+      Math.min(1, mousePosition.x / containerBounds.width),
+    )
+
+    const maxRotation = 20
+    const rotation = (normalizedX - 0.5) * 2 * maxRotation
+
+    return rotation
+  }
+
+  const strokePos = getStrokePosition()
+  const strokeRotation = getStrokeRotation()
 
   return (
     <svg
@@ -19,13 +106,25 @@ export default function FolderOpen() {
           d="M1.002 3.334c0-.644.522-1.166 1.167-1.166h4.14c.242 0 .478.075.676.215l.712.506c.197.14.433.216.675.216h5.46c.644 0 1.166.522 1.166 1.166v3.843c0 .644-.522 1.166-1.166 1.166H2.168a1.166 1.166 0 0 1-1.167-1.166v-4.78Z"
         />
       </g>
-      <g filter={`url(#b-${uid})`}>
+      <g
+        filter={`url(#b-${uid})`}
+        style={{
+          transform: getLayerTransform('b'),
+          transition: 'transform 0.2s ease-out 0.05s',
+        }}
+      >
         <path
           fill="#E7E7E7"
           d="M1.573 4.922h12.875l-1.53 5.574H3.022l-1.45-5.574Z"
         />
       </g>
-      <g filter={`url(#c-${uid})`}>
+      <g
+        filter={`url(#c-${uid})`}
+        style={{
+          transform: getLayerTransform('c'),
+          transition: 'transform 0.20s ease-out',
+        }}
+      >
         <path
           fill="#F6F6F6"
           d="M.962 5.566h14.097l-1.675 6.104H2.549L.962 5.566Z"
@@ -34,9 +133,20 @@ export default function FolderOpen() {
       <path
         stroke="#FF905D"
         strokeWidth=".175"
-        d="m2.57 5.91.035.288a.15.15 0 0 0 .297-.036l-.064-.517a.312.312 0 0 0-.619.075l.097.794"
+        d={`m${strokePos.x} ${strokePos.y}.035.288a.15.15 0 0 0 .297-.036l-.064-.517a.312.312 0 0 0-.619.075l.097.794`}
+        style={{
+          transform: `rotate(${strokeRotation}deg)`,
+          transformOrigin: `${strokePos.x}px ${strokePos.y}px`,
+          transition: 'all 0.15s ease-out',
+        }}
       />
-      <g filter={`url(#d-${uid})`}>
+      <g
+        filter={`url(#d-${uid})`}
+        style={{
+          transform: getLayerTransform('d'),
+          transition: 'transform 0.25s ease-out',
+        }}
+      >
         <path
           fill="#fff"
           d="M.624 6.426h14.773l-1.755 6.396H2.287L.624 6.426Z"
@@ -59,12 +169,6 @@ export default function FolderOpen() {
           d="M.392 8.49a.558.558 0 0 1 .549-.662h14.114c.35 0 .613.318.549.661l-.809 4.291c-.1.527-.56.91-1.096.91H2.297c-.536 0-.997-.383-1.096-.91L.392 8.49Z"
         />
       </g>
-      <path
-        stroke={`url(#h-${uid})`}
-        strokeDasharray="0.22 0.22"
-        strokeWidth=".112"
-        d="M14.945 7.828v.056h.11c.038 0 .075.004.11.012l.011-.054a.553.553 0 0 1 .22.102l-.033.045a.506.506 0 0 1 .14.168l.048-.025a.55.55 0 0 1 .06.235h.002l-.056.002a.505.505 0 0 1-.009.11l-.02.107.055.01-.04.215-.055-.01-.04.215.054.01-.04.214-.054-.01-.041.214.054.011-.04.214-.055-.01-.04.214.054.01-.04.216-.055-.011-.04.215.055.01-.04.214-.056-.01-.04.214.055.011-.04.214-.056-.01-.40.215.055.01-.40.215-.055-.011-.40.215.054.01-.40.215-.055-.01-.40.214.054.01-.40.215-.055-.01-.040.214.055.01-.041.215-.055-.10-.02.107a1.06 1.06 0 0 1-.03.119l.052.015c-.026.084-.06.162-.103.236l-.047-.029c-.042.071-.092.137-.148.196l.04.037c-.06.062-.126.117-.198.164l-.03-.046c-.067.044-.14.08-.218.108l.018.052a1.11 1.11 0 0 1-.25.059l-.005-.054c-.04.005-.081.007-.122.007h-.11v.056h-.22v-.056h-.218v.056h-.22v-.056h-.219v.056h-.22v-.056h-.218v.056h-.22v-.056h-.219v.056h-.22v-.056h-.218v.056h-.22v-.056h-.219v.056h-.22v-.056h-.218v.056h-.22v-.056h-.22v.056h-.218v-.056h-.22v.056h-.219v.056h-.22v.056h-.218v-.056h-.22v.056h-.219v-.056h-.22v.056h-.218v-.056h-.22v.056H7.67v-.056h-.22v.056h-.218v-.056h-.22v.056h-.219v-.056h-.22v.056h-.218v-.056h-.22v.056h-.219v-.056h-.22v.056h-.218v-.056h-.22v.056h-.219v-.056h-.22v.056H4.6v-.056H4.38v.056h-.22v-.056h-.218v.056h-.22v-.056h-.219v.056h-.22v-.056h-.218v.056h-.22v-.056h-.219v.056h-.22v-.056h-.109c-.041 0-.082-.002-.122-.007l-.007.054c-.086-.01-.17-.03-.25-.059l.02-.052a1.057 1.057 0 0 1-.219-.108l-.03.046a1.12 1.12 0 0 1-.198-.164l.04-.037a1.064 1.064 0 0 1-.147-.196l-.049.029a1.108 1.108 0 0 1-.102-.236l.053-.015a1.071 1.071 0 0 1-.03-.12l-.02-.106-.056.01-.041-.215.056-.01-.04-.215-.056.011-.04-.215.056-.01-.041-.214-.056.01-.04-.214.056-.011-.041-.215-.055.01-.041-.214.056-.01-.04-.215-.056.011-.04-.216.054-.10-.40-.213-.055.10-.40-.216.055-.10-.40-.214-.055.10-.041-.214.055-.011-.40-.214-.055.009-.40-.214.054-.10-.40-.215-.055.010-.40-.215.054-.008-.40-.215-.055.10-.40-.215.054-.10-.02-.107-.008-.11-.056-.002a.553.553 0 0 1 .60-.235l.50.025a.507.507 0 0 1 .14-.168L.6 7.944a.553.553 0 0 1 .22-.102l.012.054a.508.508 0 0 1 .11-.012h.11v-.056h.22v.056h.22v-.056h.221v.056h.221v-.056h.22v.056h.221v-.056h.221v.056h.22v-.056h.22v.056h.221v-.056h.22v.056h.222v-.056h.22v.056h.22v-.056h.22v.056h.221v-.056H4.8v.056h.22v-.056h.222v.056h.22v-.056h.22v.056h.22v-.056h.221v.056h.221v-.056h.22v.056h.22v-.056h.221v.056h.221v-.056h.22v.056h.221v-.056h.221v.056h.22v-.056h.20v.056h.221v-.056h.20v.056h.222v.056h.20v-.056h.20v-.056h.20v.056h.221v-.056h.221v.056h.20v-.056h.221v.056h.20v-.056h.221v.056h.20v-.056h.221v.056h.221v-.056h.20v.056h.20v-.056h.221v.056h.20v-.056h.222v.056h.20v-.056h.221v.056h.20v-.056h.20v.056h.221v-.056h.20v-.056h.222v.056h.20v-.056h.221v.056h.20Z"
-      />
       <defs>
         <filter
           id={`a-${uid}`}

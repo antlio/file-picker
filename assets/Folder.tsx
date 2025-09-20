@@ -37,16 +37,6 @@ export default function Folder() {
           rx="1.167"
         />
       </g>
-      <rect
-        width="13.883"
-        height="8.747"
-        x="1.058"
-        y="5.027"
-        stroke="url(#e)"
-        strokeDasharray="0.29 0.29"
-        strokeWidth=".117"
-        rx="1.108"
-      />
       <defs>
         <filter
           id="a"

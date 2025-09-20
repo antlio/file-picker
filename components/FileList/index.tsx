@@ -144,6 +144,15 @@ export function FileListContainer({
     'all' | 'indexed' | 'not_indexed'
   >('all')
   const [hoveredFolderId, setHoveredFolderId] = useState<string | null>(null)
+  const [mousePosition, setMousePosition] = useState<{
+    x: number
+    y: number
+  } | null>(null)
+  const [hoveredFolderBounds, setHoveredFolderBounds] = useState<{
+    width: number
+    height: number
+  } | null>(null)
+  const [isAnimating, setIsAnimating] = useState<string | null>(null)
 
   const { searchQuery, sortBy, sortOrder, updateSearch, updateSort } =
     useSearchSort()
@@ -321,23 +330,50 @@ export function FileListContainer({
    * handle folder hover with debounced prefetch and visual state
    */
   const handleFolderHover = useCallback(
-    (folder: File, isEntering: boolean) => {
+    (folder: File, isEntering: boolean, event?: React.MouseEvent) => {
       if (isEntering) {
         setHoveredFolderId(folder.resource_id)
 
+        // capture folder bounds for mouse tracking
+        if (event) {
+          const rect = event.currentTarget.getBoundingClientRect()
+          setHoveredFolderBounds({ width: rect.width, height: rect.height })
+        }
+
+        // start animation after a brief delay to show the unstacking effect
+        const animationTimeoutId = setTimeout(() => {
+          setIsAnimating(folder.resource_id)
+        }, 50)
+
         // debounce prefetch to avoid excessive requests
-        const timeoutId = setTimeout(() => {
+        const prefetchTimeoutId = setTimeout(() => {
           prefetchFolderContent(folder)
         }, 150)
 
-        return () => clearTimeout(timeoutId)
+        return () => {
+          clearTimeout(animationTimeoutId)
+          clearTimeout(prefetchTimeoutId)
+        }
       } else {
         // clear state when leaving
         setHoveredFolderId(null)
+        setIsAnimating(null)
+        setMousePosition(null)
+        setHoveredFolderBounds(null)
       }
     },
     [prefetchFolderContent],
   )
+
+  /**
+   * handle mouse move within folder to track position for icon animation
+   */
+  const handleFolderMouseMove = useCallback((event: React.MouseEvent) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const x = event.clientX - rect.left
+    const y = event.clientY - rect.top
+    setMousePosition({ x, y })
+  }, [])
 
   /**
    * handle item selection (memoized for performance)
@@ -645,15 +681,24 @@ export function FileListContainer({
                           handleFolderClick(folder)
                         }
                       }}
-                      onMouseEnter={() => {
-                        const cleanup = handleFolderHover(folder, true)
+                      onMouseEnter={(e) => {
+                        const cleanup = handleFolderHover(folder, true, e)
                         return cleanup
                       }}
+                      onMouseMove={
+                        hoveredFolderId === folder.resource_id
+                          ? handleFolderMouseMove
+                          : undefined
+                      }
                       onMouseLeave={() => handleFolderHover(folder, false)}
                     >
                       <div className="w-40 h-40 mb-3 flex items-center justify-center transition-all duration-200 ease-in-out overflow-hidden">
                         {hoveredFolderId === folder.resource_id ? (
-                          <FolderOpen />
+                          <FolderOpen
+                            mousePosition={mousePosition}
+                            containerBounds={hoveredFolderBounds}
+                            isHovered={isAnimating === folder.resource_id}
+                          />
                         ) : (
                           <Folder />
                         )}
