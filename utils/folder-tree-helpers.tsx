@@ -56,7 +56,7 @@ export function createTreeItem(
 ): TreeDataItem {
   const folderPath = getFolderPath(folder)
   return {
-    id: folderPath,
+    id: folder.resource_id,
     name: getFolderName(folder),
     icon: Folder,
     onClick: () => onFolderSelect(folderPath),
