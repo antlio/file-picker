@@ -1,5 +1,6 @@
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
+import { useNavigationStore } from '@/store/navigationStore'
 
 /**
  * custom hook for managing file navigation state
@@ -7,17 +8,21 @@ import { useCallback, useEffect, useState } from 'react'
  */
 export function useFileNavigation({
   initialPath = [],
-  pathToIdMap,
   onNavigate,
 }: {
   initialPath?: string[]
-  pathToIdMap: Map<string, string>
   onNavigate?: (path: string, folderId: string | null) => void
 }) {
   const router = useRouter()
-  const [currentFolderPath, setCurrentFolderPath] = useState<string>('/')
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
-  const [isNavigatingToFolder, setIsNavigatingToFolder] = useState(false)
+  const {
+    currentFolderPath,
+    currentFolderId,
+    isNavigatingToFolder,
+    pathToIdMap,
+    setCurrentFolder,
+    setNavigating,
+    addPathMapping,
+  } = useNavigationStore()
 
   /**
    * update URL with current folder path using clean path-based routing
@@ -39,7 +44,8 @@ export function useFileNavigation({
           ? `/${pathSegments.map((segment) => encodeURIComponent(segment)).join('/')}`
           : ''
 
-      router.push(`${encodedPath}${queryString}`, { scroll: false })
+      const finalPath = encodedPath || '/'
+      router.push(`${finalPath}${queryString}`, { scroll: false })
     },
     [router],
   )
@@ -49,10 +55,19 @@ export function useFileNavigation({
    */
   const handleFolderNavigate = useCallback(
     (folderPath: string, folderId: string | null) => {
-      // update navigation state atomically to prevent flashing
-      setIsNavigatingToFolder(true)
-      setCurrentFolderId(folderId)
-      setCurrentFolderPath(folderPath)
+      // prevent duplicate navigation to the same folder
+      if (currentFolderPath === folderPath && currentFolderId === folderId) {
+        return
+      }
+
+      // prevent URL sync from interfering
+      isManualNavigationRef.current = true
+      if (folderId) {
+        addPathMapping(folderPath, folderId)
+      }
+
+      // update navigation state
+      setCurrentFolder(folderPath, folderId)
 
       // notify parent component
       onNavigate?.(folderPath, folderId)
@@ -60,40 +75,66 @@ export function useFileNavigation({
       // update URL
       updateURL(folderPath)
     },
-    [onNavigate, updateURL],
+    [
+      onNavigate,
+      updateURL,
+      currentFolderPath,
+      currentFolderId,
+      addPathMapping,
+      setCurrentFolder,
+    ],
   )
 
   /**
    * clear navigation state
    */
   const clearNavigationState = useCallback(() => {
-    setIsNavigatingToFolder(false)
-  }, [])
+    setNavigating(false)
+  }, [setNavigating])
 
   /**
    * sync with URL path changes on initial load only (avoid navigation conflicts)
    */
+  const hasInitialSyncRef = useRef(false)
+  const isManualNavigationRef = useRef(false)
+
   useEffect(() => {
-    // Only sync on initial load when we have initial path but current path is still root
-    if (
+    // Only navigate on initial page load when URL has a path but we're at root
+    // Skip if we're in the middle of manual navigation
+    const targetPath =
+      initialPath.length > 0 ? `/${initialPath.join('/')}` : '/'
+    const shouldSync =
       initialPath.length > 0 &&
       currentFolderPath === '/' &&
-      pathToIdMap.size > 0
-    ) {
+      pathToIdMap.size > 0 &&
+      !hasInitialSyncRef.current &&
+      !isManualNavigationRef.current &&
+      targetPath !== currentFolderPath
+
+    if (shouldSync) {
       const decodedPathSegments = initialPath.map((segment) =>
         decodeURIComponent(segment),
       )
+
+      // deepest available folder in the path
       const targetFolderPath = `/${decodedPathSegments.join('/')}`
       const folderId = pathToIdMap.get(targetFolderPath) || null
 
       if (folderId) {
-        setCurrentFolderPath(targetFolderPath)
-        setCurrentFolderId(folderId)
-        setIsNavigatingToFolder(true)
+        hasInitialSyncRef.current = true
+        setCurrentFolder(targetFolderPath, folderId)
         onNavigate?.(targetFolderPath, folderId)
+        updateURL(targetFolderPath)
       }
     }
-  }, [initialPath, currentFolderPath, pathToIdMap, onNavigate])
+  }, [
+    initialPath,
+    currentFolderPath,
+    pathToIdMap,
+    onNavigate,
+    updateURL,
+    setCurrentFolder,
+  ])
 
   return {
     currentFolderPath,

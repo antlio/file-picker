@@ -1,25 +1,65 @@
 'use client'
 
-import { Suspense, useCallback, useState } from 'react'
+import { Suspense, useCallback, useRef } from 'react'
 import { FileListContainer } from '@/components/FileList'
 import { FilePickerLayout } from '@/components/FilePickerLayout'
+import { ExpandableFolderTree } from '@/components/FolderTree'
 import { TopBar } from '@/components/TopBar'
 import { useConnectionSync } from '@/hooks/useConnectionSync'
 import { useFileDrawer } from '@/hooks/useFileDrawer'
+import { useSearchSort } from '@/hooks/useSearchSort'
+import { useNavigationStore } from '@/store/navigationStore'
 
 export default function HomePage() {
-  const [currentFolderPath, setCurrentFolderPath] = useState<string>('/')
   const { selectedConnectionId, handleConnectionSelect } = useConnectionSync()
   const { selectedFile, isDrawerOpen, handleFileClick, handleCloseDrawer } =
     useFileDrawer()
+  const { params: searchParams } = useSearchSort()
+  const { currentFolderPath } = useNavigationStore()
+
+  // Store reference to navigation function from FileListContainer
+  const navigationRef = useRef<
+    ((folderPath: string, folderId: string | null) => void) | null
+  >(null)
 
   /**
    * handle breadcrumb navigation from TopBar
-   * @param folderPath
    */
   const handleBreadcrumbNavigate = useCallback(
-    (folderPath: string) => {
-      setCurrentFolderPath(folderPath)
+    (folderPath: string, folderId: string | null) => {
+      if (navigationRef.current) {
+        navigationRef.current(folderPath, folderId)
+      } else {
+        console.error('Page: No navigation function available!')
+      }
+      handleCloseDrawer()
+    },
+    [handleCloseDrawer],
+  )
+
+  /**
+   * receive navigation function from FileListContainer
+   */
+  const handleNavigationReady = useCallback(
+    (
+      handleFolderNavigate: (
+        folderPath: string,
+        folderId: string | null,
+      ) => void,
+    ) => {
+      navigationRef.current = handleFolderNavigate
+    },
+    [],
+  )
+
+  /**
+   * navigation for folder tree
+   */
+  const handleTreeNavigate = useCallback(
+    (folderPath: string, folderId: string | null) => {
+      if (navigationRef.current) {
+        navigationRef.current(folderPath, folderId)
+      }
       handleCloseDrawer()
     },
     [handleCloseDrawer],
@@ -27,19 +67,33 @@ export default function HomePage() {
 
   /**
    * handle connection selection with folder reset
-   * @param connectionId
    */
   const handleConnectionSelectWithReset = useCallback(
     (connectionId: string) => {
       handleConnectionSelect(connectionId)
-      setCurrentFolderPath('/')
     },
     [handleConnectionSelect],
   )
 
+  const baseParams = { sort: searchParams.sort, order: searchParams.order }
+
+  // folder tree component with navigation
+  const folderTreeContent = (
+    <ExpandableFolderTree
+      connectionId={selectedConnectionId}
+      currentFolderPath={currentFolderPath}
+      onFolderSelect={() => {
+        // should use onNavigate instead
+      }}
+      onNavigate={handleTreeNavigate}
+      searchParams={baseParams}
+    />
+  )
+
   return (
     <FilePickerLayout
-      showFolderTree={false}
+      showFolderTree={true}
+      sidebarContent={folderTreeContent}
       onConnectionSelect={handleConnectionSelectWithReset}
       selectedFile={selectedFile}
       isDrawerOpen={isDrawerOpen}
@@ -48,10 +102,7 @@ export default function HomePage() {
       {/* top bar with breadcrumb navigation */}
       <div className="border-border">
         <Suspense fallback={<div className="h-16 bg-muted/20" />}>
-          <TopBar
-            currentFolderPath={currentFolderPath}
-            onNavigate={handleBreadcrumbNavigate}
-          />
+          <TopBar onNavigate={handleBreadcrumbNavigate} />
         </Suspense>
       </div>
 
@@ -62,6 +113,7 @@ export default function HomePage() {
             connectionId={selectedConnectionId}
             onFileClick={handleFileClick}
             initialPath={[]}
+            onNavigationReady={handleNavigationReady}
           />
         </Suspense>
       </div>

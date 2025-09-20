@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { Suspense, use, useCallback } from 'react'
+import { Suspense, use, useCallback, useRef } from 'react'
 import { FileListContainer } from '@/components/FileList'
 import { FilePickerLayout } from '@/components/FilePickerLayout'
 import { ExpandableFolderTree } from '@/components/FolderTree'
@@ -30,17 +30,54 @@ export default function PathPage({ params }: PathPageProps) {
 
   const baseParams = { sort: searchParams.sort, order: searchParams.order }
   const currentFolderPath = decodeFolderPath(resolvedParams.path)
+  const navigationRef = useRef<
+    ((folderPath: string, folderId: string | null) => void) | null
+  >(null)
 
   /**
-   * handle navigation with router push
-   * @param folderPath - target folder path
+   * handle breadcrumb navigation from TopBar
    */
-  const handleNavigate = useCallback(
-    (folderPath: string) => {
-      const url = buildNavigationUrl(folderPath)
-      router.push(url, { scroll: false })
+  const handleBreadcrumbNavigate = useCallback(
+    (folderPath: string, folderId: string | null) => {
+      if (navigationRef.current) {
+        navigationRef.current(folderPath, folderId)
+      }
+      handleCloseDrawer()
     },
-    [router],
+    [handleCloseDrawer],
+  )
+
+  /**
+   * receive navigation function from FileListContainer
+   */
+  const handleNavigationReady = useCallback(
+    (
+      handleFolderNavigate: (
+        folderPath: string,
+        folderId: string | null,
+      ) => void,
+    ) => {
+      navigationRef.current = handleFolderNavigate
+    },
+    [],
+  )
+
+  /**
+   * navigation for folder tree (uses Zustand navigation when available, falls back to router)
+   */
+  const handleTreeNavigate = useCallback(
+    (folderPath: string, folderId: string | null) => {
+      // Try Zustand navigation first
+      if (navigationRef.current) {
+        navigationRef.current(folderPath, folderId)
+      } else {
+        // Fallback to router navigation
+        const url = buildNavigationUrl(folderPath)
+        router.push(url, { scroll: false })
+      }
+      handleCloseDrawer()
+    },
+    [router, handleCloseDrawer],
   )
 
   // folder tree component with navigation
@@ -48,7 +85,11 @@ export default function PathPage({ params }: PathPageProps) {
     <ExpandableFolderTree
       connectionId={selectedConnectionId}
       currentFolderPath={currentFolderPath}
-      onFolderSelect={handleNavigate}
+      onFolderSelect={(folderPath: string) => {
+        const folderId = null
+        handleTreeNavigate(folderPath, folderId)
+      }}
+      onNavigate={handleTreeNavigate}
       searchParams={baseParams}
     />
   )
@@ -65,10 +106,7 @@ export default function PathPage({ params }: PathPageProps) {
       {/* top bar */}
       <div>
         <Suspense fallback={<div className="h-16 bg-muted/20" />}>
-          <TopBar
-            currentFolderPath={currentFolderPath}
-            onNavigate={handleNavigate}
-          />
+          <TopBar onNavigate={handleBreadcrumbNavigate} />
         </Suspense>
       </div>
 
@@ -79,6 +117,7 @@ export default function PathPage({ params }: PathPageProps) {
             connectionId={selectedConnectionId}
             onFileClick={handleFileClick}
             initialPath={resolvedParams.path || []}
+            onNavigationReady={handleNavigationReady}
           />
         </Suspense>
       </div>

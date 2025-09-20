@@ -8,7 +8,7 @@ import {
   SortDesc,
   X,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Folder from '@/assets/Folder'
 import FolderOpen from '@/assets/FolderOpen'
 import { FloatingToolbar } from '@/components/FloatingToolbar'
@@ -26,9 +26,9 @@ import { useDeindexAction } from '@/hooks/useDeindexAction'
 import { useFileNavigation } from '@/hooks/useFileNavigation'
 import { useFolderListing, usePrefetchFolder } from '@/hooks/useFolderListing'
 import { useIndexAction } from '@/hooks/useIndexAction'
-import { usePathMapping } from '@/hooks/usePathMapping'
 import { useSearchSort } from '@/hooks/useSearchSort'
 import type { File } from '@/lib/types'
+import { useNavigationStore } from '@/store/navigationStore'
 import { generateFolderCacheKey } from '@/utils/cache-keys'
 import { FileRow } from './FileRow'
 import { SkeletonRows } from './SkeletonRow'
@@ -93,15 +93,22 @@ interface FileListContainerProps {
   connectionId?: string | null
   onFileClick?: (file: File) => void
   initialPath?: string[]
+  onNavigationReady?: (
+    handleFolderNavigate: (folderPath: string, folderId: string | null) => void,
+  ) => void
 }
 
 export function FileListContainer({
   connectionId = null,
   onFileClick,
   initialPath = [],
+  onNavigationReady,
 }: FileListContainerProps) {
-  // clean state management
-  const { pathToIdMap, updatePathMapping, addFolderMapping } = usePathMapping()
+  const { updatePathMapping, addPathMapping } = useNavigationStore()
+  const lastNavigationRef = useRef<{
+    folderPath: string
+    folderId: string | null
+  } | null>(null)
 
   const {
     currentFolderPath,
@@ -111,8 +118,25 @@ export function FileListContainer({
     clearNavigationState,
   } = useFileNavigation({
     initialPath,
-    pathToIdMap,
+    onNavigate: (folderPath: string, folderId: string | null) => {
+      const current = { folderPath, folderId }
+      if (
+        lastNavigationRef.current &&
+        lastNavigationRef.current.folderPath === current.folderPath &&
+        lastNavigationRef.current.folderId === current.folderId
+      ) {
+        return
+      }
+      lastNavigationRef.current = current
+    },
   })
+
+  // eepose navigation function to parent component
+  useEffect(() => {
+    if (onNavigationReady) {
+      onNavigationReady(handleFolderNavigate)
+    }
+  }, [onNavigationReady, handleFolderNavigate])
 
   // Component state
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
@@ -240,7 +264,10 @@ export function FileListContainer({
    * separate filtered items into folders and files
    */
   const filteredFolders = useMemo(() => {
-    return filteredItems.filter((item) => item.inode_type === 'directory')
+    const folders = filteredItems.filter(
+      (item) => item.inode_type === 'directory',
+    )
+    return folders
   }, [filteredItems])
 
   const filteredFiles = useMemo(() => {
@@ -257,7 +284,7 @@ export function FileListContainer({
         : `/${folder.resource_id}`
 
       // immediately update path mapping for this folder
-      addFolderMapping(folderPath, folder.resource_id)
+      addPathMapping(folderPath, folder.resource_id)
 
       // clear selected items and prefetch if needed
       setSelectedItems(new Set())
@@ -274,13 +301,7 @@ export function FileListContainer({
       // navigate using the hook
       handleFolderNavigate(folderPath, folder.resource_id)
     },
-    [
-      addFolderMapping,
-      connectionId,
-      baseParams,
-      prefetch,
-      handleFolderNavigate,
-    ],
+    [addPathMapping, connectionId, baseParams, prefetch, handleFolderNavigate],
   )
 
   /**
@@ -448,25 +469,38 @@ export function FileListContainer({
   )
   const targetFolderPath =
     decodedPathSegments.length > 0 ? `/${decodedPathSegments.join('/')}` : '/'
-  const isPathMismatch = targetFolderPath !== currentFolderPath
 
   // check if current data matches the target path
   const isDataForCorrectPath = useMemo(() => {
-    if (targetFolderPath === '/') {
-      return currentFolderId === null
-    }
-    const targetFolderId = pathToIdMap.get(targetFolderPath)
-    return targetFolderId === currentFolderId && targetFolderId !== undefined
-  }, [targetFolderPath, currentFolderId, pathToIdMap])
+    const hasData = currentItems.length > 0
+    const isInitialLoadWithNoData =
+      !hasData && !isNavigatingToFolder && isLoading
 
-  // show skeleton when we truly have no data to display
+    // skeleton during initial load or when we don't have data yet
+    if (isInitialLoadWithNoData) {
+      return false
+    }
+
+    // For root folder, check if we're actually at root
+    if (currentFolderPath === '/') {
+      const isRoot = currentFolderId === null
+      return isRoot && hasData
+    }
+    return hasData
+  }, [
+    currentFolderId,
+    currentFolderPath,
+    currentItems.length,
+    isLoading,
+    isNavigatingToFolder,
+  ])
+
+  // show skeleton when navigating or loading correct data
   const showSkeletonContent =
-    isNavigatingToFolder ||
-    (isLoading && currentItems.length === 0 && !isDataForCorrectPath)
+    isNavigatingToFolder || (isLoading && !isDataForCorrectPath)
 
   // content when navigating OR when data doesn't match current path
-  const shouldHideContent =
-    isNavigatingToFolder || (!isDataForCorrectPath && currentItems.length === 0)
+  const shouldHideContent = isNavigatingToFolder || !isDataForCorrectPath
 
   // error state
   if (isError) {
@@ -598,7 +632,10 @@ export function FileListContainer({
                       key={folder.resource_id}
                       type="button"
                       className="flex flex-col items-center p-3 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors group"
-                      onClick={() => handleFolderClick(folder)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleFolderClick(folder)
+                      }}
                       onKeyDown={(e) => {
                         if (
                           (e.key === 'Enter' || e.key === ' ') &&
