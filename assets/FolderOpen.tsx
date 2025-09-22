@@ -1,3 +1,5 @@
+import { useMemo } from 'react'
+
 interface FolderOpenProps {
   mousePosition?: { x: number; y: number } | null
   containerBounds?: { width: number; height: number } | null
@@ -10,7 +12,7 @@ export default function FolderOpen({
   isHovered = false,
 }: FolderOpenProps = {}) {
   // Generate unique IDs for this instance to avoid conflicts when multiple icons are rendered
-  const uid = Math.random().toString(36).substring(2, 11)
+  const uid = useMemo(() => Math.random().toString(36).substring(2, 11), [])
 
   // Calculate unstacking transforms for each layer
   const getLayerTransform = (layerType: 'b' | 'c' | 'd') => {
@@ -38,8 +40,8 @@ export default function FolderOpen({
     }
   }
 
-  // position for the orange stroke element based on mouse position
-  const getStrokePosition = () => {
+  // memoize stroke position and rotation calculations for performance
+  const { strokePos, strokeRotation } = useMemo(() => {
     let baseY = 5.91
 
     // adjust Y position based on stacking state - follow layer 'c'
@@ -50,11 +52,15 @@ export default function FolderOpen({
     }
 
     if (!mousePosition || !containerBounds) {
-      return { x: 2.57, y: baseY }
+      return {
+        strokePos: { x: 2.57, y: baseY },
+        strokeRotation: 0,
+      }
     }
 
     const folderContentWidth = 13
     const folderStartX = 1
+    const maxRotation = 20
 
     // mouse position to folder content area
     const normalizedX = Math.max(
@@ -65,29 +71,14 @@ export default function FolderOpen({
     // svg coordinates within the folder content area
     const strokeX = folderStartX + normalizedX * folderContentWidth
 
-    return { x: strokeX, y: baseY }
-  }
-
-  // rotation based on position
-  const getStrokeRotation = () => {
-    if (!mousePosition || !containerBounds) {
-      return 0
-    }
-
-    // normalize position (0 = left, 1 = right)
-    const normalizedX = Math.max(
-      0,
-      Math.min(1, mousePosition.x / containerBounds.width),
-    )
-
-    const maxRotation = 20
+    // rotation based on position
     const rotation = (normalizedX - 0.5) * 2 * maxRotation
 
-    return rotation
-  }
-
-  const strokePos = getStrokePosition()
-  const strokeRotation = getStrokeRotation()
+    return {
+      strokePos: { x: strokeX, y: baseY },
+      strokeRotation: rotation,
+    }
+  }, [mousePosition, containerBounds, isHovered])
 
   return (
     <svg
@@ -137,7 +128,10 @@ export default function FolderOpen({
         style={{
           transform: `rotate(${strokeRotation}deg)`,
           transformOrigin: `${strokePos.x}px ${strokePos.y}px`,
-          transition: 'all 0.15s ease-out',
+          transition: mousePosition
+            ? 'transform 0.08s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+            : 'all 0.15s ease-out',
+          willChange: mousePosition ? 'transform' : 'auto',
         }}
       />
       <g

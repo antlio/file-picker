@@ -372,7 +372,11 @@ export function FileListContainer({
     const rect = event.currentTarget.getBoundingClientRect()
     const x = event.clientX - rect.left
     const y = event.clientY - rect.top
-    setMousePosition({ x, y })
+
+    // use requestAnimationFrame for smooth animation performance
+    requestAnimationFrame(() => {
+      setMousePosition({ x, y })
+    })
   }, [])
 
   /**
