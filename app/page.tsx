@@ -122,5 +122,9 @@ function HomePageContent() {
 }
 
 export default function HomePage() {
-  return <HomePageContent />
+  return (
+    <Suspense>
+      <HomePageContent />
+    </Suspense>
+  )
 }
