@@ -51,49 +51,12 @@ export function FileContentDrawer({
             const mimeType = fileItem.content_mime || ''
 
             try {
-              if (mimeType.includes('text/') || mimeType.includes('json')) {
-                // Try to fetch text content directly
-                const directUrl = `https://drive.google.com/uc?id=${fileId}&export=download`
-                const response = await fetch(directUrl, {
-                  mode: 'cors',
-                  credentials: 'include',
-                })
-
-                if (response.ok) {
-                  const textContent = await response.text()
-                  setFileContent(textContent)
-                  setContentType(mimeType)
-                  return
-                }
-              } else if (mimeType.includes('application/pdf')) {
+              if (mimeType.includes('application/pdf')) {
                 // For PDFs, use embedded viewer that doesn't require auth
                 const embedUrl = `https://drive.google.com/file/d/${fileId}/preview`
                 setFileContent(embedUrl)
                 setContentType(mimeType)
                 return
-              } else if (mimeType.includes('image/')) {
-                // Try direct image URL, fallback to API if auth fails
-                const directUrl = `https://drive.google.com/uc?id=${fileId}`
-
-                // Test if the image is accessible
-                const img = new Image()
-                img.crossOrigin = 'anonymous'
-
-                const imageLoadPromise = new Promise((resolve, reject) => {
-                  img.onload = () => resolve(directUrl)
-                  img.onerror = () => reject(new Error('Image not accessible'))
-                })
-
-                img.src = directUrl
-
-                try {
-                  await imageLoadPromise
-                  setFileContent(directUrl)
-                  setContentType(mimeType)
-                  return
-                } catch {
-                  // Image not accessible, fallback to API
-                }
               }
             } catch (error) {
               console.warn(
