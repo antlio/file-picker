@@ -45,7 +45,7 @@ export function Breadcrumbs({
 
         // e.g Root > Books > Summaries
         pathSegments.forEach((segment, index) => {
-          const segmentPath = '/' + pathSegments.slice(0, index + 1).join('/')
+          const segmentPath = `/${pathSegments.slice(0, index + 1).join('/')}`
           breadcrumbItems.push({
             path: segmentPath,
             name: segment,
@@ -54,7 +54,7 @@ export function Breadcrumbs({
       }
 
       setBreadcrumbs(breadcrumbItems)
-    } catch (error) {
+    } catch (_error) {
       // fallback
       setBreadcrumbs([
         { path: '/', name: 'Root', isRoot: true },

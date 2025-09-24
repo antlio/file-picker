@@ -348,7 +348,7 @@ export async function getOrCreateKnowledgeBase(
  */
 export async function startIndex(
   connectionId: string,
-  resourceId: string,
+  _resourceId: string,
   _isFolder = false,
   _recursive = false,
   headers: Record<string, string>,
@@ -421,7 +421,7 @@ export async function deindexResource(
  */
 export async function checkJobStatus(
   jobId: string,
-  headers: Record<string, string>,
+  _headers: Record<string, string>,
 ): Promise<JobStatusResponse> {
   // for this demo, we'll simulate job completion
   // in a real implementation, you'd have actual job status endpoints

@@ -507,7 +507,7 @@ export function FileListContainer({
   const decodedPathSegments = initialPath.map((segment) =>
     decodeURIComponent(segment),
   )
-  const targetFolderPath =
+  const _targetFolderPath =
     decodedPathSegments.length > 0 ? `/${decodedPathSegments.join('/')}` : '/'
 
   // check if current data matches the target path

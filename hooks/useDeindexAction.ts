@@ -23,7 +23,7 @@ import {
  * @param connectionId
  * @returns
  */
-export function useDeindexAction(connectionId: string) {
+export function useDeindexAction(_connectionId: string) {
   const { mutate, cache } = useSWRConfig()
   const executeResourceAction = createResourceAction(mutate, cache)
 
@@ -94,7 +94,7 @@ export function useDeindexAction(connectionId: string) {
 
       // show success toast
       showResourceSuccess({ resourceId, resourcePath, action })
-    } catch (error) {
+    } catch (_error) {
       // error already handled in executeResourceAction
     }
   }

@@ -117,7 +117,7 @@ export function useIndexAction(connectionId: string) {
         )
         showResourceSuccess({ resourceId, resourcePath, action: 'indexing' })
       }
-    } catch (error) {
+    } catch (_error) {
       // error already handled in executeResourceAction
     }
   }
