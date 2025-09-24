@@ -66,6 +66,39 @@ export function createTreeItem(
 /**
  * build tree data for folders with optional children
  * @param folderDataCache
+ * @param currentFolderPath
+ * @param onFolderSelect
+ * @returns
+ */
+function buildFolderTreeRecursive(
+  folderDataCache: Map<string | null, File[]>,
+  currentFolderPath: string,
+  onFolderSelect: (folderPath: string) => void,
+  parentFolderId: string | null = null,
+): TreeDataItem[] {
+  const items = folderDataCache.get(parentFolderId) || []
+  const folders = items.filter((item) => item.inode_type === 'directory')
+
+  return folders.map((folder) => {
+    const treeItem = createTreeItem(folder, onFolderSelect)
+
+    // load children if we have cached data for this folder
+    if (folderDataCache.has(folder.resource_id)) {
+      treeItem.children = buildFolderTreeRecursive(
+        folderDataCache,
+        currentFolderPath,
+        onFolderSelect,
+        folder.resource_id,
+      )
+    }
+
+    return treeItem
+  })
+}
+
+/**
+ * build tree data for folders with full hierarchy
+ * @param folderDataCache
  * @param currentFolderId
  * @param currentFolderPath
  * @param onFolderSelect
@@ -74,41 +107,24 @@ export function createTreeItem(
  */
 export function buildFolderTreeData(
   folderDataCache: Map<string | null, File[]>,
-  currentFolderId: string | null,
+  _currentFolderId: string | null,
   currentFolderPath: string,
   onFolderSelect: (folderPath: string) => void,
   showChildren: boolean = true,
 ): TreeDataItem[] {
-  const rootItems = folderDataCache.get(null) || []
-  const rootFolders = rootItems.filter(
-    (item) => item.inode_type === 'directory',
+  if (!showChildren) {
+    const rootItems = folderDataCache.get(null) || []
+    const rootFolders = rootItems.filter(
+      (item) => item.inode_type === 'directory',
+    )
+    return rootFolders.map((folder) => createTreeItem(folder, onFolderSelect))
+  }
+
+  return buildFolderTreeRecursive(
+    folderDataCache,
+    currentFolderPath,
+    onFolderSelect,
   )
-
-  return rootFolders.map((folder) => {
-    const folderPath = getFolderPath(folder)
-    const isCurrentFolder = folderPath === currentFolderPath
-    const treeItem = createTreeItem(folder, onFolderSelect)
-
-    // add children if this is the current folder and we want to show children
-    if (
-      showChildren &&
-      isCurrentFolder &&
-      folderDataCache.has(currentFolderId)
-    ) {
-      const currentFolderItems = folderDataCache.get(currentFolderId) || []
-      const subfolders = currentFolderItems.filter(
-        (item) => item.inode_type === 'directory',
-      )
-
-      if (subfolders.length > 0) {
-        treeItem.children = subfolders.map((subfolder) =>
-          createTreeItem(subfolder, onFolderSelect),
-        )
-      }
-    }
-
-    return treeItem
-  })
 }
 
 /**

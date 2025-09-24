@@ -129,30 +129,61 @@ const Tree = forwardRef<HTMLDivElement, TreeProps>(
         return ids
       }
 
-      function walkTreeItems(
+      function findPathToTarget(
         items: TreeDataItem[] | TreeDataItem,
         targetId: string,
-      ) {
+        currentPath: string[] = [],
+      ): string[] | null {
         if (Array.isArray(items)) {
-          // eslint-disable-next-line @typescript-eslint/prefer-for-of
-          for (let i = 0; i < items.length; i++) {
-            const item = items[i]
-            if (item) {
-              ids.push(item.id)
-              if (walkTreeItems(item, targetId) && !expandAll) {
-                return true
+          for (const item of items) {
+            const pathToItem = [...currentPath, item.id]
+
+            if (item.id === targetId) {
+              return pathToItem
+            }
+
+            if (item.children && item.children.length > 0) {
+              const childPath = findPathToTarget(
+                item.children,
+                targetId,
+                pathToItem,
+              )
+              if (childPath) {
+                return childPath
               }
             }
-            if (!expandAll) ids.pop()
           }
-        } else if (!expandAll && items.id === targetId) {
-          return true
-        } else if (items.children) {
-          return walkTreeItems(items.children, targetId)
+        } else {
+          const pathToItem = [...currentPath, items.id]
+
+          if (items.id === targetId) {
+            return pathToItem
+          }
+
+          if (items.children && items.children.length > 0) {
+            const childPath = findPathToTarget(
+              items.children,
+              targetId,
+              pathToItem,
+            )
+            if (childPath) {
+              return childPath
+            }
+          }
         }
+
+        return null
       }
 
-      walkTreeItems(data, initialSelectedItemId)
+      const pathToTarget = findPathToTarget(data, initialSelectedItemId)
+      if (pathToTarget) {
+        pathToTarget.slice(0, -1).forEach((id) => {
+          if (!ids.includes(id)) {
+            ids.push(id)
+          }
+        })
+      }
+
       return expandAll ? getAllItemIds(data) : ids
     }, [data, expandAll, initialSelectedItemId, getAllItemIds])
 
@@ -218,7 +249,7 @@ const TreeItem = forwardRef<HTMLDivElement, TreeItemProps>(
       <div ref={ref} role="tree" className={`h-full ${className}`} {...props}>
         <ul className="h-full">
           {Array.isArray(data) ? (
-            data.map((item) => (
+            data.map((item, index) => (
               <TreeNode
                 key={item.id}
                 item={item}
@@ -231,6 +262,7 @@ const TreeItem = forwardRef<HTMLDivElement, TreeItemProps>(
                 onPrefetch={onPrefetch}
                 connectionId={connectionId}
                 searchParams={searchParams}
+                isFirst={index === 0}
               />
             ))
           ) : (
@@ -245,6 +277,7 @@ const TreeItem = forwardRef<HTMLDivElement, TreeItemProps>(
               onPrefetch={onPrefetch}
               connectionId={connectionId}
               searchParams={searchParams}
+              isFirst={true}
             />
           )}
         </ul>
@@ -266,6 +299,7 @@ interface TreeNodeProps {
   onPrefetch?: (folderId: string) => void
   connectionId?: string | null
   searchParams?: Record<string, string | undefined>
+  isFirst?: boolean
 }
 
 const TreeNode = ({
@@ -279,6 +313,7 @@ const TreeNode = ({
   onPrefetch,
   connectionId,
   searchParams,
+  isFirst,
 }: TreeNodeProps) => {
   const hasChildren = item.children && item.children.length > 0
   const isSelected = selectedItemId === item.id
@@ -334,6 +369,7 @@ const TreeNode = ({
       key={item.id}
       className={`
         relative
+        ${isFirst ? 'h-full' : ''}
         ${item.id !== 'root' ? "before:content-[''] before:absolute before:block before:w-3 before:rounded-[0_5px] before:-left-[9px] before:h-5 before:border-l before:border-b before:border-border" : ''}
       `}
     >

@@ -69,9 +69,9 @@ export function BaseFolderTree({
       currentFolderId,
       currentFolderPath,
       onFolderSelect,
-      true, // Always show children to keep tree displayed at all levels
+      true,
     )
-  }, [folderDataCache, currentFolderId, currentFolderPath, onFolderSelect])
+  }, [folderDataCache, currentFolderPath, onFolderSelect, currentFolderId])
 
   /**
    * create complete tree with root node
@@ -103,7 +103,7 @@ export function BaseFolderTree({
     }
 
     // subfolders use the currentFolderId
-    if (currentFolderId) {
+    if (currentFolderId !== null && currentFolderId !== undefined) {
       return currentFolderId
     }
 
@@ -129,7 +129,6 @@ export function BaseFolderTree({
       expandAll={false}
       connectionId={connectionId}
       searchParams={searchParams as Record<string, string | undefined>}
-      key={connectionId}
     />
   )
 

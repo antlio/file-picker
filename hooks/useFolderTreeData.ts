@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo } from 'react'
+import { useSWRConfig } from 'swr'
 import { useFolderListing } from '@/hooks/useFolderListing'
 import { usePathMapping } from '@/hooks/usePathMapping'
 import type { File, SearchSortParams } from '@/lib/types'
@@ -26,10 +27,7 @@ export function useFolderTreeData({
   currentFolderPath,
   searchParams = {},
 }: UseFolderTreeDataOptions): FolderTreeData {
-  const [folderDataCache, setFolderDataCache] = useState<
-    Map<string | null, File[]>
-  >(new Map())
-
+  const { cache } = useSWRConfig()
   const { updatePathMapping, getFolderIdFromPath } = usePathMapping()
   const currentFolderId = getFolderIdFromPath(currentFolderPath)
 
@@ -41,57 +39,69 @@ export function useFolderTreeData({
   )
 
   // cache root items and update path mapping
-  useEffect(() => {
-    if (rootItems.length > 0) {
-      setFolderDataCache((prev) => new Map(prev).set(null, rootItems))
-      updatePathMapping(rootItems)
-    }
-  }, [rootItems, updatePathMapping])
+  const folderDataCache = useMemo(() => {
+    if (!connectionId) return new Map<string | null, File[]>()
 
-  // fetch current folder's children when needed
-  useEffect(() => {
-    if (
-      !connectionId ||
-      !currentFolderId ||
-      folderDataCache.has(currentFolderId)
-    ) {
-      return
-    }
+    const cacheMap = new Map<string | null, File[]>()
+    const cacheKeys = Array.from(cache.keys() || [])
 
-    const fetchCurrentFolderContents = async () => {
-      try {
-        const { listResources, getDefaultAuthHeaders } = await import(
-          '@/lib/api'
-        )
-        const headers = await getDefaultAuthHeaders()
-        const result = await listResources(
-          connectionId,
-          currentFolderId,
-          searchParams,
-          headers,
-        )
+    for (const key of cacheKeys) {
+      if (
+        typeof key === 'string' &&
+        key.includes(connectionId) &&
+        key.startsWith('drive|')
+      ) {
+        const data = cache.get(key)
+        if (data?.data?.data && Array.isArray(data.data.data)) {
+          const keyParts = key.split('|')
+          if (keyParts.length >= 3) {
+            const resourceIdPart = keyParts[2]
+            const folderId = resourceIdPart === 'root' ? null : resourceIdPart
 
-        const items = result.data || []
-        setFolderDataCache((prev) => new Map(prev).set(currentFolderId, items))
-        updatePathMapping(items)
-      } catch (error) {
-        console.error('Failed to fetch current folder contents:', {
-          currentFolderId,
-          connectionId,
-          searchParams,
-          error: error instanceof Error ? error.message : error,
-        })
+            cacheMap.set(folderId, data.data.data)
+          }
+        }
       }
     }
+    return cacheMap
+  }, [cache, connectionId])
 
-    fetchCurrentFolderContents()
-  }, [
-    connectionId,
-    currentFolderId,
+  // update path mapping for all cached items
+  useEffect(() => {
+    if (rootItems.length > 0) {
+      updatePathMapping(rootItems)
+    }
+
+    const cacheKeys = Array.from(cache.keys() || [])
+    for (const key of cacheKeys) {
+      if (
+        typeof key === 'string' &&
+        key.includes(connectionId || '') &&
+        key.startsWith('drive|')
+      ) {
+        const data = cache.get(key)
+        if (data?.data?.data && Array.isArray(data.data.data)) {
+          const keyParts = key.split('|')
+          if (keyParts.length >= 3 && keyParts[2] !== 'root') {
+            updatePathMapping(data.data.data)
+          }
+        }
+      }
+    }
+  }, [rootItems, updatePathMapping, cache, connectionId])
+
+  // ensure parent folders are loaded
+  const pathSegments = currentFolderPath.split('/').filter(Boolean)
+  const parentPath =
+    pathSegments.length > 1 ? `/${pathSegments.slice(0, -1).join('/')}` : null
+  const parentFolderId = parentPath ? getFolderIdFromPath(parentPath) : null
+
+  // ensure parent folder is loaded
+  useFolderListing(
+    parentFolderId ? connectionId : null,
+    parentFolderId,
     searchParams,
-    folderDataCache,
-    updatePathMapping,
-  ])
+  )
 
   return {
     folderDataCache,
