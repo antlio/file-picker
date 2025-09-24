@@ -292,9 +292,7 @@ export function FileContentDrawer({
             </div>
           </div>
         ) : (
-          <ScrollArea className="h-full">
-            <div className="h-full p-3">{renderFileContent()}</div>
-          </ScrollArea>
+          <div className="h-full p-3">{renderFileContent()}</div>
         )}
       </div>
 
