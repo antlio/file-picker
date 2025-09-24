@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton'
  */
 export function SkeletonRow() {
   return (
-    <div className="flex items-center justify-between space-x-4 px-3 py-4.75 border-b border-border last:border-b-0">
+    <div className="flex items-center justify-between space-x-4 px-3 py-4.75">
       {/* checkbox/icon */}
       <Skeleton className="h-4 w-4" />
 
@@ -29,7 +29,7 @@ export function SkeletonRow() {
  */
 export function SkeletonRows({ count = 8 }: { count?: number }) {
   return (
-    <div className="bg-white first:rounded-t-lg last:rounded-b-lg divide-y divide-border">
+    <div className="bg-white first:rounded-t-lg last:rounded-b-lg border">
       {Array.from({ length: count }).map((_) => (
         <SkeletonRow key={nanoid()} />
       ))}
