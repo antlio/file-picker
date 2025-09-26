@@ -1,7 +1,7 @@
 'use client'
 
 import { ChevronRight } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 
 interface BreadcrumbItem {
@@ -24,15 +24,8 @@ export function Breadcrumbs({
   onNavigate,
   className = '',
 }: BreadcrumbsProps) {
-  const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-
-  /**
-   * build breadcrumb path from folder path segments
-   */
-  const buildBreadcrumbs = useCallback(() => {
-    setIsLoading(true)
-
+  // compute breadcrumbs directly from currentFolderPath using useMemo
+  const breadcrumbs = useMemo(() => {
     try {
       const breadcrumbItems: BreadcrumbItem[] = [
         { path: '/', name: 'Root', isRoot: true },
@@ -53,23 +46,17 @@ export function Breadcrumbs({
         })
       }
 
-      setBreadcrumbs(breadcrumbItems)
+      return breadcrumbItems
     } catch (_error) {
       // fallback
-      setBreadcrumbs([
+      return [
         { path: '/', name: 'Root', isRoot: true },
         ...(currentFolderPath !== '/'
           ? [{ path: currentFolderPath, name: currentFolderPath }]
           : []),
-      ])
-    } finally {
-      setIsLoading(false)
+      ]
     }
   }, [currentFolderPath])
-
-  useEffect(() => {
-    buildBreadcrumbs()
-  }, [buildBreadcrumbs])
 
   /**
    * handle breadcrumb click navigation
@@ -80,18 +67,6 @@ export function Breadcrumbs({
     },
     [onNavigate],
   )
-
-  if (isLoading) {
-    return (
-      <div
-        className={`flex items-center space-x-2 p-3 border-b border-border bg-muted/20 ${className}`}
-      >
-        <div className="h-6 w-16 bg-muted animate-pulse rounded" />
-        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-        <div className="h-6 w-24 bg-muted animate-pulse rounded" />
-      </div>
-    )
-  }
 
   return (
     <nav
