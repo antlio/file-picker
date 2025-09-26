@@ -4,7 +4,7 @@
  */
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useDebouncedCallback } from 'use-debounce'
 import type { SearchSortParams } from '@/lib/types'
 
@@ -16,23 +16,32 @@ export function useSearchSort() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
+  // initialize state from url params
+  const initialQuery = searchParams.get('q') || ''
+  const initialSort = (searchParams.get('sort') as 'name' | 'date') || 'name'
+  const initialOrder = (searchParams.get('order') as 'asc' | 'desc') || 'asc'
+
   // local state for immediate ui updates
-  const [searchQuery, setSearchQuery] = useState('')
-  const [sortBy, setSortBy] = useState<'name' | 'date'>('name')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [searchQuery, setSearchQuery] = useState(initialQuery)
+  const [sortBy, setSortBy] = useState<'name' | 'date'>(initialSort)
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(initialOrder)
   const [filter, setFilter] = useState<'all' | 'indexed' | 'not_indexed'>('all')
 
-  // initialize from url params (exclude filter for instant switching)
-  useEffect(() => {
-    const q = searchParams.get('q') || ''
-    const sort = (searchParams.get('sort') as 'name' | 'date') || 'name'
-    const order = (searchParams.get('order') as 'asc' | 'desc') || 'asc'
+  // track initialization to avoid syncing loops
+  const hasInitialized = useRef(false)
 
-    setSearchQuery(q)
-    setSortBy(sort)
-    setSortOrder(order)
-    // Keep filter as local state only - don't sync with URL
-  }, [searchParams])
+  // one-time initialization from URL params
+  if (!hasInitialized.current) {
+    const urlQuery = searchParams.get('q') || ''
+    const urlSort = (searchParams.get('sort') as 'name' | 'date') || 'name'
+    const urlOrder = (searchParams.get('order') as 'asc' | 'desc') || 'asc'
+
+    if (urlQuery !== initialQuery) setSearchQuery(urlQuery)
+    if (urlSort !== initialSort) setSortBy(urlSort)
+    if (urlOrder !== initialOrder) setSortOrder(urlOrder)
+
+    hasInitialized.current = true
+  }
 
   // debounced search to avoid excessive api calls
   const debouncedUpdateUrl = useDebouncedCallback(

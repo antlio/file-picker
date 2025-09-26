@@ -733,9 +733,9 @@ export function FileListContainer({
           {/* file list */}
           <div className="bg-background border-x flex-1 flex flex-col h-full px-2.5 pb-2.5">
             <div className="sticky pt-4 top-0 z-10 bg-white">
-              {(filteredFolders.length > 0 ||
-                currentFolderPath !== '/' ||
-                showSkeletonContent) && (
+              {(filteredFiles.length > 0 ||
+                showSkeletonContent ||
+                (isEmpty && filteredFolders.length > 0)) && (
                 <h2 className="text-xl font-medium mb-4 px-4">Documents</h2>
               )}
               <div className="bg-muted/50 border border-dashed border-b-0 flex items-center space-x-4 pl-3.25 pr-4 py-3 text-xs font-medium text-muted-foreground tracking-wide">
