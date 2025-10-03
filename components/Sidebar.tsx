@@ -1,6 +1,7 @@
 'use client'
 
 import { RotateCcw } from 'lucide-react'
+import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import {
   Tooltip,
@@ -113,10 +114,12 @@ export function Sidebar({
                 disabled={!!selectedConnectionId}
                 className={`flex items-center flex-1 min-w-0 ${selectedConnectionId ? 'cursor-default' : 'cursor-pointer'}`}
               >
-                <img
+                <Image
                   src="https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg"
-                  alt="Google Drive"
-                  className="h-4 w-4 mr-2 flex-shrink-0"
+                  alt="Google Drive logo"
+                  width={16}
+                  height={16}
+                  className="absolute mr-2 flex-shrink-0"
                 />
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-sm">Google Drive</div>

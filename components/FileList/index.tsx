@@ -21,7 +21,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useDeindexAction } from '@/hooks/useDeindexAction'
 import { useFileNavigation } from '@/hooks/useFileNavigation'
 import { useFolderListing, usePrefetchFolder } from '@/hooks/useFolderListing'
@@ -625,40 +624,56 @@ export function FileListContainer({
       {/* Filter tabs */}
       <div className="bg-[image:radial-gradient(circle,_var(--color-border)_0.5px,_transparent_0.5px)] bg-[size:2.5px_2.5px] bg-[position:0px_0px] px-1.5">
         <div className="bg-white border-b border-x border-border px-2.5 py-3">
-          <Tabs
-            value={currentFilter}
-            onValueChange={(value: string) => {
-              setCurrentFilter(value as typeof currentFilter)
-            }}
+          <div
+            role="tablist"
+            aria-label="Filter files"
+            className="bg-muted/50 border border-dashed text-muted-foreground inline-flex w-fit items-center justify-center has-[button:first-child[data-state=active]]:rounded-l-lg has-[button:last-child[data-state=active]]:rounded-r-lg"
           >
-            <TabsList>
-              <TabsTrigger
-                value="all"
-                className="flex items-center space-x-2 px-4"
-              >
-                <span>Overview</span>
-              </TabsTrigger>
-              <TabsTrigger
-                value="indexed"
-                className="flex items-center space-x-2"
-              >
-                <span>Indexed</span>
-                <AnimatedCounter value={precomputedFilters.indexed.length} />
-              </TabsTrigger>
-              <TabsTrigger
-                value="not_indexed"
-                className="flex items-center space-x-2"
-              >
-                <span>Not Indexed</span>
-                <AnimatedCounter
-                  value={precomputedFilters.not_indexed.length}
-                />
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={currentFilter === 'all'}
+              aria-controls="file-list-content"
+              onClick={() => setCurrentFilter('all')}
+              data-state={currentFilter === 'all' ? 'active' : 'inactive'}
+              className="-m-px cursor-pointer data-[state=active]:bg-white data-[state=active]:border-border focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring text-foreground inline-flex flex-1 items-center justify-center rounded-sm border border-transparent px-4 py-0.75 text-sm font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:outline-1 space-x-2"
+            >
+              <span>Overview</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={currentFilter === 'indexed'}
+              aria-controls="file-list-content"
+              onClick={() => setCurrentFilter('indexed')}
+              data-state={currentFilter === 'indexed' ? 'active' : 'inactive'}
+              className="-m-px cursor-pointer data-[state=active]:bg-white data-[state=active]:border-border focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring text-foreground inline-flex flex-1 items-center justify-center rounded-sm border border-transparent px-4 py-0.75 text-sm font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:outline-1 space-x-2"
+            >
+              <span>Indexed</span>
+              <AnimatedCounter value={precomputedFilters.indexed.length} />
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={currentFilter === 'not_indexed'}
+              aria-controls="file-list-content"
+              onClick={() => setCurrentFilter('not_indexed')}
+              data-state={
+                currentFilter === 'not_indexed' ? 'active' : 'inactive'
+              }
+              className="-m-px cursor-pointer data-[state=active]:bg-white data-[state=active]:border-border focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring text-foreground inline-flex flex-1 items-center justify-center rounded-sm border border-transparent px-4 py-0.75 text-sm font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:outline-1 space-x-2"
+            >
+              <span>Not Indexed</span>
+              <AnimatedCounter value={precomputedFilters.not_indexed.length} />
+            </button>
+          </div>
         </div>
       </div>
-      <div className="h-[calc(100dvh-153px)] overflow-auto">
+      <div
+        id="file-list-content"
+        role="tabpanel"
+        className="h-[calc(100dvh-153px)] overflow-auto"
+      >
         <div className="bg-[image:radial-gradient(circle,_var(--color-border)_0.5px,_transparent_0.5px)] bg-[size:2.5px_2.5px] bg-[position:0px_0px] px-1.5">
           {/* folders section */}
           {!shouldHideContent &&
@@ -746,6 +761,7 @@ export function FileListContainer({
                     className={
                       someSelected ? 'data-[state=checked]:bg-primary/50' : ''
                     }
+                    aria-label="Select all files"
                   />
                 </div>
                 <div className="flex-1 min-w-0">Name</div>

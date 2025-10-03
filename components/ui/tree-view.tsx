@@ -367,6 +367,10 @@ const TreeNode = ({
   return (
     <li
       key={item.id}
+      role="treeitem"
+      tabIndex={-1}
+      aria-expanded={hasChildren ? isExpanded : undefined}
+      aria-selected={isSelected}
       className={`
         relative
         ${isFirst ? 'h-full' : ''}
@@ -399,6 +403,7 @@ const TreeNode = ({
         }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
+        aria-label={item.name}
       >
         {Icon && (
           <Icon
@@ -412,7 +417,11 @@ const TreeNode = ({
 
       {/* render children only when expanded */}
       {hasChildren && isExpanded && (
-        <ul className="ml-2.5 border-l border-muted pl-2 h-full space-y-1">
+        // biome-ignore lint/a11y/useSemanticElements: role="group" is the correct ARIA pattern for tree children
+        <ul
+          role="group"
+          className="ml-2.5 border-l border-muted pl-2 h-full space-y-1"
+        >
           {item.children?.map((child) => (
             <TreeNode
               key={child.id}

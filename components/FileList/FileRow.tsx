@@ -168,6 +168,7 @@ export const FileRow = memo(function FileRow({
             onCheckedChange={handleSelectChange}
             onClick={(e) => e.stopPropagation()}
             className="relative flex-shrink-0"
+            aria-label={`Select ${item.inode_path.path}`}
           />
         </div>
       </div>
